@@ -1,0 +1,1 @@
+Persistente Hashmap with predictable behavior, O(1) operations based on index over sequence files.
