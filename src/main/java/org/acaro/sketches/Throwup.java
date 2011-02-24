@@ -10,40 +10,53 @@ import java.nio.ByteBuffer;
  *
  */
 
-public class Throwup extends Sketch {
-	final private ByteBuffer value;
-
+public class Throwup implements Sketch {
+	final private byte[] key;
+	final private byte[] value;
+	final private long ts;
+	private byte[] header;
+	
 	public Throwup(byte[] key, byte[] value) {
-		super(key);
-		this.value = ByteBuffer.wrap(value);
+		this.key    = key;
+		this.value  = value;
+		this.ts = System.currentTimeMillis();
+		initHeader();
 	}
 
-	public Throwup(ByteBuffer key, ByteBuffer value, long ts) {
-		super(key, ts);
-		this.value = value;
+	public Throwup(byte[] key, byte[] value, long ts) {
+		this.key    = key;
+		this.value  = value;
+		this.ts		= ts;
+		initHeader();	
 	}
 
-	public ByteBuffer getValue() {
+	public byte[] getKey() {
+		return this.key;
+	}
+	
+	public byte[] getValue() {
 		return this.value;
 	}
 
-	// FIXME: the header is created multiple times while the object is immutable.
-	@Override
 	public ByteBuffer[] getBytes() {
-		ByteBuffer header = ByteBuffer.allocate(HEADER_SIZE);
-		header.put(THROWUP);
-		header.putLong(getTimestamp());
-		header.putShort((short) getKey().array().length);
-		header.putInt(value.array().length);
-		header.rewind();
-		
-		ByteBuffer[] tokens = { header, getKey(), value };
+		ByteBuffer[] tokens = { ByteBuffer.wrap(header), ByteBuffer.wrap(key), ByteBuffer.wrap(value) };
 		
 		return tokens;
 	}
 
-	@Override
 	public int getSize() {
-		return value.array().length;
+		return key.length + value.length;
+	}
+
+	public long getTimestamp() {
+		return this.ts;
+	}
+	
+	private void initHeader() {
+		this.header = ByteBuffer.allocate(HEADER_SIZE).put(THROWUP)
+		.putLong(ts)
+		.putShort((short) key.length)
+		.putInt(value.length)
+		.array();
 	}
 }

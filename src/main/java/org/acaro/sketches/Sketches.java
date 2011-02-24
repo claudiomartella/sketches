@@ -48,7 +48,7 @@ public class Sketches {
 			if (s instanceof Buff) { // but it was deleted
 				value = null;
 			} else if (s instanceof Throwup) { // and we found it
-				value = ((Throwup) s).getValue().array();
+				value = ((Throwup) s).getValue();
 			}
 		}
 		
@@ -64,7 +64,7 @@ public class Sketches {
 		// it's still around
 		if ((s = doGet(key)) != null && !(s instanceof Buff)) {
 			doDelete(key);
-			value = ((Throwup) s).getValue().array();
+			value = ((Throwup) s).getValue();
 		}
 		
 		return value;
@@ -126,7 +126,7 @@ public class Sketches {
 
 	private void initSketchBook(String path, String name) throws IOException {
 		String filename = SketchesHelper.getFilename(path, name);
-		this.memory = SketchesHelper.loadSketchBook(filename);
-		this.book   = new SketchBook(filename);
+		this.memory = SketchesHelper.loadMappedSketchBook(filename);
+		this.book   = new BufferedSketchBook(filename);
 	}
 }

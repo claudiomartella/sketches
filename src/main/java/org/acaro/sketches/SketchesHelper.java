@@ -3,8 +3,11 @@ package org.acaro.sketches;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.channels.FileChannel.MapMode;
 
 /**
  * 
@@ -13,7 +16,6 @@ import java.nio.channels.FileChannel;
  * Replay of the log to MindSketches. 
  * If no file is found an empty MindSketch is returned ready to be filled and used.
  *
- * No buffering is used for reading, cross your fingers and relay on the I/O Scheduler's read-ahead.
  */
 
 public class SketchesHelper {
@@ -53,20 +55,20 @@ public class SketchesHelper {
 					value = ByteBuffer.allocate(valueSize);
 					ByteBuffer[] tokens = { key, value };
 					ch.read(tokens);
-					s = new Throwup(key, value, ts);
+					s = new Throwup(key.array(), value.array(), ts);
 					break;
 
 				case Sketch.BUFF:
 
 					key = ByteBuffer.allocate(keySize);
 					ch.read(key);
-					s = new Buff(key, ts); 
+					s = new Buff(key.array(), ts); 
 					break;
 
 				default: throw new IOException("Corrupted SketchBook: read unknown type: " + type); 
 				}
 				header.rewind();
-				memory.put(s.getKey().array(), s);
+				memory.put(s.getKey(), s);
 				//System.err.println(totalLoaded++);
 				totalLoaded++;
 			}
@@ -85,6 +87,66 @@ public class SketchesHelper {
 		return memory;
 	}
 
+	public static MindSketches loadMappedSketchBook(String file) throws IOException {
+		MindSketches memory = new MindSketches();
+		RandomAccessFile book = null;
+		FileChannel ch = null;
+		int loaded=0;
+		
+		try {
+			book = new RandomAccessFile(file, "rw");
+			ch = book.getChannel();
+			MappedByteBuffer buffer = ch.map(MapMode.READ_WRITE, 0, ch.size());
+			buffer.load();
+			
+			while (buffer.hasRemaining()) {
+				byte type = buffer.get();
+				long ts = buffer.getLong();
+				short keySize = buffer.getShort();
+				int valueSize = buffer.getInt();
+				
+				Sketch s;
+				byte[] key, value;
+				
+				switch (type) {
+				
+				case Sketch.THROWUP: 
+
+					key = new byte[keySize];
+					value = new byte[valueSize];
+					buffer.get(key); 
+					buffer.get(value);
+					s = new Throwup(key, value, ts);
+					break;
+
+				case Sketch.BUFF:
+
+					key = new byte[keySize];
+					buffer.get(key);
+					s = new Buff(key, ts); 
+					break;
+
+				default: throw new IOException("Corrupted SketchBook: read unknown type: " + type); 
+				}
+				memory.put(s.getKey(), s);
+				loaded++;
+			}
+			
+			book.close();
+		} catch (FileNotFoundException e) {
+			System.err.println("No old log found, starting from scratch");
+		} catch (BufferUnderflowException e) {
+			System.err.println("Truncated file, we probably died without synching correctly");
+			ch.truncate(ch.position());
+			ch.force(true);
+			book.close();
+		}
+
+		System.err.println(loaded + " loaded: " + memory.getSize());
+		
+		return memory;
+	}
+	
 	public static String getFilename(String path, String name) {
 		return path + "/" + name + EXTENSION;
 	}

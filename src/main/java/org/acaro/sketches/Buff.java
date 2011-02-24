@@ -7,36 +7,49 @@ import java.nio.ByteBuffer;
  * @author Claudio Martella
  * 
  * This represents a deleted value. Deleted values are purged during compaction.
- * This is what is normally known as a Tombstone in NoSQL KV stores.
+ * This is what is normally known as a Tombstone in some NoSQL KV stores.
  *
  */
-public class Buff extends Sketch {
-
+public class Buff implements Sketch {
+	final private byte[] key;
+	final private long ts;
+	private byte[] header;
+	
 	public Buff(byte[] key){
-		super(key);
+		this.key    = key;
+		this.ts = System.currentTimeMillis();
+		initHeader();
 	}
 	
-	public Buff(ByteBuffer key, long ts) {
-		super(key, ts);
+	public Buff(byte[] key, long ts) {
+		this.key    = key;
+		this.ts		= ts;
+		initHeader();	
 	}
 
-	// FIXME: the header is created multiple times while the object is immutable.
-	@Override
 	public ByteBuffer[] getBytes() {
-		ByteBuffer header = ByteBuffer.allocate(HEADER_SIZE);
-		header.put(BUFF);
-		header.putLong(getTimestamp());
-		header.putShort((short) getKey().array().length);
-		header.putInt(0);
-		header.rewind();
-		
-		ByteBuffer[] tokens = { header, getKey() };
+		ByteBuffer[] tokens = { ByteBuffer.wrap(header), ByteBuffer.wrap(key) };
 		
 		return tokens;
 	}
-
-	@Override
+	
+	public byte[] getKey() {
+		return this.key;
+	}
+	
 	public int getSize() {
-		return 0;
+		return key.length;
+	}
+
+	public long getTimestamp() {
+		return this.ts;
+	}
+	
+	private void initHeader() {
+		this.header = ByteBuffer.allocate(HEADER_SIZE).put(THROWUP)
+		.putLong(ts)
+		.putShort((short) key.length)
+		.putInt(0)
+		.array();
 	}
 }
