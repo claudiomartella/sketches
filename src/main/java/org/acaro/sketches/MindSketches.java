@@ -1,5 +1,6 @@
 package org.acaro.sketches;
 
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -18,5 +19,9 @@ public class MindSketches {
 	
 	public int getSize() {
 		return size.get();
+	}
+	
+	public Map<byte[], Sketch> getMap() {
+		return this.map;
 	}
 }

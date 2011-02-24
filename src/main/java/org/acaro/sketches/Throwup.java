@@ -45,7 +45,7 @@ public class Throwup implements Sketch {
 	}
 
 	public int getSize() {
-		return key.length + value.length;
+		return header.length + key.length + value.length;
 	}
 
 	public long getTimestamp() {

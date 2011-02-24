@@ -14,7 +14,8 @@ public class App
     public static void main( String[] args ) throws IOException
     {
     	long start = System.currentTimeMillis();
-    	Sketches data = new Sketches(".", "test");    	
+    	Sketches data = new Sketches(".", "test");
+    	data.burn();
     	data.shutdown();
     	long stop = System.currentTimeMillis();
     	

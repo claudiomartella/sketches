@@ -38,7 +38,7 @@ public class Buff implements Sketch {
 	}
 	
 	public int getSize() {
-		return key.length;
+		return header.length + key.length;
 	}
 
 	public long getTimestamp() {

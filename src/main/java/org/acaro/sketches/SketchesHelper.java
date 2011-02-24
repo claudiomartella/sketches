@@ -1,6 +1,8 @@
 package org.acaro.sketches;
 
+import java.io.BufferedOutputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.BufferUnderflowException;
@@ -8,6 +10,13 @@ import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileChannel.MapMode;
+import java.util.Comparator;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.TreeMap;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * 
@@ -19,75 +28,10 @@ import java.nio.channels.FileChannel.MapMode;
  */
 
 public class SketchesHelper {
-	
+	final static Logger logger = LoggerFactory.getLogger(SketchesHelper.class);
 	private static final String EXTENSION = ".sb";
 
 	public static MindSketches loadSketchBook(String file) throws IOException {
-		MindSketches memory = new MindSketches();
-		int totalLoaded = 0;
-		
-		System.err.println("Looking for " + file);
-		
-		try {
-			// replay the log
-			RandomAccessFile book = new RandomAccessFile(file, "r");
-			
-			System.err.println("Old logfile found, replaying...");
-			
-			FileChannel ch = book.getChannel();
-			ByteBuffer header = ByteBuffer.allocate(Sketch.HEADER_SIZE);
-			int size;	
-			while ((size = ch.read(header)) == Sketch.HEADER_SIZE) {
-				//System.err.println("we read the header:" + size);
-				
-				byte type = header.get(0);
-				long ts = header.getLong(1);
-				short keySize = header.getShort(9);
-				int valueSize = header.getInt(11);
-
-				Sketch s;
-				ByteBuffer key, value;
-				switch (type) {
-				
-				case Sketch.THROWUP: 
-
-					key = ByteBuffer.allocate(keySize);
-					value = ByteBuffer.allocate(valueSize);
-					ByteBuffer[] tokens = { key, value };
-					ch.read(tokens);
-					s = new Throwup(key.array(), value.array(), ts);
-					break;
-
-				case Sketch.BUFF:
-
-					key = ByteBuffer.allocate(keySize);
-					ch.read(key);
-					s = new Buff(key.array(), ts); 
-					break;
-
-				default: throw new IOException("Corrupted SketchBook: read unknown type: " + type); 
-				}
-				header.rewind();
-				memory.put(s.getKey(), s);
-				//System.err.println(totalLoaded++);
-				totalLoaded++;
-			}
-			if (size != 0) {
-				throw new IOException("Corrupted SketchBook: some data left: " + size);
-			}
-			System.err.println("Log replayed: " + totalLoaded + " entries loaded\n"+
-								"memory is now " + memory.getSize());
-			
-			book.close();
-			
-		} catch (FileNotFoundException e) {
-			System.err.println("No old log found, starting from scratch");
-		} 
-		
-		return memory;
-	}
-
-	public static MindSketches loadMappedSketchBook(String file) throws IOException {
 		MindSketches memory = new MindSketches();
 		RandomAccessFile book = null;
 		FileChannel ch = null;
@@ -133,21 +77,64 @@ public class SketchesHelper {
 			}
 			
 			book.close();
-		} catch (FileNotFoundException e) {
-			System.err.println("No old log found, starting from scratch");
 		} catch (BufferUnderflowException e) {
-			System.err.println("Truncated file, we probably died without synching correctly");
+			logger.info("Truncated file, we probably died without synching correctly");
 			ch.truncate(ch.position());
 			ch.force(true);
 			book.close();
 		}
 
-		System.err.println(loaded + " loaded: " + memory.getSize());
+		logger.debug(loaded + " loaded: " + memory.getSize());
 		
 		return memory;
 	}
 	
 	public static String getFilename(String path, String name) {
 		return path + "/" + name + EXTENSION;
+	}
+	
+	public static void burnMindSketches(MindSketches memory, String filename) throws IOException {
+		long start = System.currentTimeMillis();
+		logger.info("burning started: " + start);
+		
+		TreeMap<byte[], Sketch> sortedMap = new TreeMap<byte[], Sketch>(new Comparator<byte[]>() {
+			// lexicographic comparison
+			public int compare(byte[] left, byte[] right) {
+				for (int i = 0, j = 0; i < left.length && j < right.length; i++, j++) {
+					int a = (left[i] & 0xff);
+					int b = (right[j] & 0xff);
+					if (a != b) {
+						return a - b;
+					}
+				}
+				return left.length - right.length;
+			}
+		});
+		sortedMap.putAll(memory.getMap());
+		logger.debug("MindSketches is sorted");
+		
+		FileOutputStream fos = new FileOutputStream(filename, false);
+		BufferedOutputStream bos = new BufferedOutputStream(fos, 1024*1024);
+		FileChannel fc = fos.getChannel();
+		
+		ByteBuffer header = ByteBuffer.allocate(Wall.HEADER_SIZE);
+		header.put(Wall.DIRTY);
+		header.putLong(sortedMap.size());
+		header.rewind();
+		fc.write(header);
+		
+		for (Entry<byte[], Sketch> entry: sortedMap.entrySet()) {
+			//logger.debug("burning " + entry.getKey());
+			for (ByteBuffer b: entry.getValue().getBytes()) 
+				bos.write(b.array());
+		}
+		
+		bos.flush();
+		header.put(0, Wall.CLEAN);
+		header.rewind();
+		fc.write(header);
+		fos.close();
+		
+		logger.info("burning finished: " + (System.currentTimeMillis()-start));
 	}
 }

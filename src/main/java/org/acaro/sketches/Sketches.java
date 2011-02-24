@@ -79,6 +79,12 @@ public class Sketches {
 	public void shutdown() throws IOException {
 		book.close();
 	}
+
+	public void burn() throws IOException {
+		MindSketches oldMemory = memory;
+		memory = new MindSketches();
+		SketchesHelper.burnMindSketches(oldMemory, path+"/"+name+".br");
+	}
 	
 	private void doDelete(byte[] key) throws IOException {
 		Buff b = new Buff(key);
@@ -126,7 +132,7 @@ public class Sketches {
 
 	private void initSketchBook(String path, String name) throws IOException {
 		String filename = SketchesHelper.getFilename(path, name);
-		this.memory = SketchesHelper.loadMappedSketchBook(filename);
+		this.memory = SketchesHelper.loadSketchBook(filename);
 		this.book   = new BufferedSketchBook(filename);
 	}
 }
