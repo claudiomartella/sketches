@@ -130,6 +130,7 @@ public class SketchesHelper {
 		}
 		
 		bos.flush();
+		fc.position(0);
 		header.put(0, Wall.CLEAN);
 		header.rewind();
 		fc.write(header);
