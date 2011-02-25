@@ -18,9 +18,9 @@ package org.acaro.sketches;
 
 public class Wall {
 	//private BookIndex index;
-	static final public int HEADER_SIZE = Util.SIZEOF_BYTE+Util.SIZEOF_LONG;
-	static final public byte CLEAN = 1;
-	static final public byte DIRTY = 2;
+	public static final int HEADER_SIZE = Util.SIZEOF_BYTE+Util.SIZEOF_LONG;
+	public static final byte CLEAN = 1;
+	public static final byte DIRTY = 2;
 	
 	public Sketch get(byte[] key) {
 		Sketch s = null;

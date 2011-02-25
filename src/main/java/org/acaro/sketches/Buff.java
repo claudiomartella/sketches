@@ -26,8 +26,8 @@ import java.nio.ByteBuffer;
  *
  */
 public class Buff implements Sketch {
-	final private byte[] key;
-	final private long ts;
+	private final byte[] key;
+	private final long ts;
 	private byte[] header;
 	
 	public Buff(byte[] key){

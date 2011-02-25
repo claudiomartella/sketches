@@ -27,9 +27,9 @@ import java.nio.ByteBuffer;
  */
 
 public class Throwup implements Sketch {
-	final private byte[] key;
-	final private byte[] value;
-	final private long ts;
+	private final byte[] key;
+	private final byte[] value;
+	private final long ts;
 	private byte[] header;
 	
 	public Throwup(byte[] key, byte[] value) {
