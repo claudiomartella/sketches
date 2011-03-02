@@ -1,4 +1,4 @@
-/*Copyright 2011 Claudio Martella
+/* Copyright 2011 Claudio Martella
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@
 package org.acaro.sketches;
 
 import java.io.BufferedOutputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -27,7 +26,8 @@ import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileChannel.MapMode;
 import java.util.Comparator;
-import java.util.Map;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map.Entry;
 import java.util.TreeMap;
 
@@ -51,7 +51,7 @@ public class SketchesHelper {
 		MindSketches memory = new MindSketches();
 		RandomAccessFile book = null;
 		FileChannel ch = null;
-		int loaded=0;
+		int loaded = 0;
 		
 		try {
 			book = new RandomAccessFile(file, "rw");
@@ -88,6 +88,7 @@ public class SketchesHelper {
 
 				default: throw new IOException("Corrupted SketchBook: read unknown type: " + type); 
 				}
+				
 				memory.put(s.getKey(), s);
 				loaded++;
 			}
@@ -113,19 +114,7 @@ public class SketchesHelper {
 		long start = System.currentTimeMillis();
 		logger.info("burning started: " + start);
 		
-		TreeMap<byte[], Sketch> sortedMap = new TreeMap<byte[], Sketch>(new Comparator<byte[]>() {
-			// lexicographic comparison
-			public int compare(byte[] left, byte[] right) {
-				for (int i = 0, j = 0; i < left.length && j < right.length; i++, j++) {
-					int a = (left[i] & 0xff);
-					int b = (right[j] & 0xff);
-					if (a != b) {
-						return a - b;
-					}
-				}
-				return left.length - right.length;
-			}
-		});
+		TreeMap<byte[], Sketch> sortedMap = new TreeMap<byte[], Sketch>(new KeyComparator());
 		sortedMap.putAll(memory.getMap());
 		logger.debug("MindSketches is sorted");
 		
@@ -134,17 +123,18 @@ public class SketchesHelper {
 		FileChannel fc = fos.getChannel();
 		
 		ByteBuffer header = ByteBuffer.allocate(Wall.HEADER_SIZE);
+		// this file's a work in progress
 		header.put(Wall.DIRTY);
 		header.putLong(sortedMap.size());
 		header.rewind();
 		fc.write(header);
 		
 		for (Entry<byte[], Sketch> entry: sortedMap.entrySet()) {
-			//logger.debug("burning " + entry.getKey());
 			for (ByteBuffer b: entry.getValue().getBytes()) 
 				bos.write(b.array());
 		}
 		
+		// It's finished, freeze it
 		bos.flush();
 		fc.position(0);
 		header.put(0, Wall.CLEAN);
@@ -153,5 +143,63 @@ public class SketchesHelper {
 		fos.close();
 		
 		logger.info("burning finished: " + (System.currentTimeMillis()-start));
+	}
+	
+	public static void wallMerger(List<WallScanner> wallScanners, String filename) throws IOException {
+		if (wallScanners.size() < 2) throw new IllegalArgumentException("Can't merge less than 2 Walls");
+		boolean finished = false;
+		
+		FileOutputStream fos = new FileOutputStream(filename, false);
+		BufferedOutputStream bos = new BufferedOutputStream(fos, 1024*1024);
+		FileChannel fc = fos.getChannel();
+		
+		Wall[] walls = new Wall[wallScanners.size()];
+		walls = wallScanners.toArray(walls);
+		
+		Comparator<byte[]> comparator = new KeyComparator();
+		
+		Sketch[] sketches = new Sketch[wallScanners.size()];
+		
+		int i = 0;
+		for (WallScanner scanner: wallScanners) {
+			if (scanner.hasNext())
+				sketches[i] = scanner.next();
+			else 
+				sketches[i] = null;
+			i++;
+		}
+		
+		while (!finished) {
+			Integer[] minValues = getMins(sketches, comparator);
+			
+			// write the minimum and most recent
+			for (ByteBuffer data: sketches[minValues[0]].getBytes())
+				bos.write(data.array());
+
+			// advance these scanners
+			for (int index: minValues) {
+				if (walls[index].hasNext())
+					sketches[index] = walls[index].next();
+				else
+					sketches[index] = null;
+			}
+			
+			finished = true;
+			// we have more data to compare?
+			for (Sketch sketch: sketches)
+				if (sketch != null)
+					finished = false;
+		}
+		
+		bos.flush();
+		bos.close();
+	}
+	
+	private static Integer[] getMins(Sketch[] sketches, Comparator<byte[]> comparator) {
+		List<Integer> mins = new LinkedList<Integer>();
+		byte[] minKey = sketches[0].getKey();
+		
+		
+		return (Integer[]) mins.toArray();
 	}
 }

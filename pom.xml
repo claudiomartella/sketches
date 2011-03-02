@@ -19,5 +19,17 @@
       <artifactId>logback-classic</artifactId>
       <version>0.9.27</version>
     </dependency>
+    <dependency>
+      <groupId>high-scale-lib</groupId>
+      <artifactId>high-scale-lib</artifactId>
+      <version>UNKNOWN</version>
+      <scope>system</scope>
+      <systemPath>${basedir}/lib/high-scale-lib.jar</systemPath>
+    </dependency>
+    <dependency>
+    	<groupId>com.googlecode.concurrentlinkedhashmap</groupId>
+    	<artifactId>concurrentlinkedhashmap-lru</artifactId>
+    	<version>1.1</version>
+	</dependency>
   </dependencies>
 </project>

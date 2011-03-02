@@ -1,4 +1,4 @@
-/*Copyright 2011 Claudio Martella
+/* Copyright 2011 Claudio Martella
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -47,7 +47,6 @@ public class Sketches {
 	
 	public void put(byte[] key, byte[] value) throws IOException {
 		checkKey(key);
-		checkValue(value);
 		
 		Throwup t = new Throwup(key, value);
 		book.write(t);
@@ -131,15 +130,8 @@ public class Sketches {
 	}
 	
 	private void checkKey(byte[] key) {
-		if (key == null)
-			throw new IllegalArgumentException("key argument is null");
 		if (key.length > Short.MAX_VALUE) 
 			throw new IllegalArgumentException("key length can not be bigger than "+ Short.MAX_VALUE);
-	}
-	
-	private void checkValue(byte[] value) {
-		if (value == null)
-			throw new IllegalArgumentException("value argument is null");
 	}
 	
 	private void initWalls(String path, String name) {
