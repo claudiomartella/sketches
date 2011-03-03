@@ -38,8 +38,7 @@ import org.slf4j.LoggerFactory;
  * 
  * @author Claudio Martella
  * 
- * Replay of the log to MindSketches. 
- * If no file is found an empty MindSketch is returned ready to be filled and used.
+ * Helper Class
  *
  */
 
@@ -110,7 +109,7 @@ public class SketchesHelper {
 		return path + "/" + name + EXTENSION;
 	}
 	
-	public static void burnMindSketches(MindSketches memory, String filename) throws IOException {
+	public static void bombMindSketches(MindSketches memory, String filename) throws IOException {
 		long start = System.currentTimeMillis();
 		logger.info("burning started: " + start);
 		
@@ -122,9 +121,9 @@ public class SketchesHelper {
 		BufferedOutputStream bos = new BufferedOutputStream(fos, 1024*1024);
 		FileChannel fc = fos.getChannel();
 		
-		ByteBuffer header = ByteBuffer.allocate(Wall.HEADER_SIZE);
+		ByteBuffer header = ByteBuffer.allocate(Mural.HEADER_SIZE);
 		// this file's a work in progress
-		header.put(Wall.DIRTY);
+		header.put(Mural.DIRTY);
 		header.putLong(sortedMap.size());
 		header.rewind();
 		fc.write(header);
@@ -137,7 +136,7 @@ public class SketchesHelper {
 		// It's finished, freeze it
 		bos.flush();
 		fc.position(0);
-		header.put(0, Wall.CLEAN);
+		header.put(0, Mural.CLEAN);
 		header.rewind();
 		fc.write(header);
 		fos.close();
@@ -145,23 +144,23 @@ public class SketchesHelper {
 		logger.info("burning finished: " + (System.currentTimeMillis()-start));
 	}
 	
-	public static void wallMerger(List<WallScanner> wallScanners, String filename) throws IOException {
-		if (wallScanners.size() < 2) throw new IllegalArgumentException("Can't merge less than 2 Walls");
+	public static void muralScriber(List<MuralScanner> muralScanners, String filename) throws IOException {
+		if (muralScanners.size() < 2) throw new IllegalArgumentException("Can't merge less than 2 murals");
 		boolean finished = false;
 		
 		FileOutputStream fos = new FileOutputStream(filename, false);
 		BufferedOutputStream bos = new BufferedOutputStream(fos, 1024*1024);
 		FileChannel fc = fos.getChannel();
 		
-		Wall[] walls = new Wall[wallScanners.size()];
-		walls = wallScanners.toArray(walls);
+		Mural[] murals = new Mural[muralScanners.size()];
+		murals = muralScanners.toArray(murals);
 		
 		Comparator<byte[]> comparator = new KeyComparator();
 		
-		Sketch[] sketches = new Sketch[wallScanners.size()];
+		Sketch[] sketches = new Sketch[muralScanners.size()];
 		
 		int i = 0;
-		for (WallScanner scanner: wallScanners) {
+		for (MuralScanner scanner: muralScanners) {
 			if (scanner.hasNext())
 				sketches[i] = scanner.next();
 			else 
@@ -178,8 +177,8 @@ public class SketchesHelper {
 
 			// advance these scanners
 			for (int index: minValues) {
-				if (walls[index].hasNext())
-					sketches[index] = walls[index].next();
+				if (murals[index].hasNext())
+					sketches[index] = murals[index].next();
 				else
 					sketches[index] = null;
 			}

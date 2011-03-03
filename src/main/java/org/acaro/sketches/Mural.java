@@ -16,7 +16,16 @@
 
 package org.acaro.sketches;
 
-public class Wall {
+/**
+ * @author Claudio Martella
+ * 
+ * This is where immutable sketches go. Data in these files can't be overwritten. 
+ * Think of it as SequenceFile. 
+ * 
+ * "A large and labor-intensive graffiti painting."
+ */
+
+public class Mural {
 	//private BookIndex index;
 	public static final int HEADER_SIZE = Util.SIZEOF_BYTE+Util.SIZEOF_LONG;
 	public static final byte CLEAN = 1;

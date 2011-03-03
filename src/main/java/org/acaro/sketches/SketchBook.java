@@ -19,6 +19,17 @@ package org.acaro.sketches;
 import java.io.Closeable;
 import java.io.IOException;
 
+/**
+ * @author Claudio Martella
+ * 
+ * This is the Log. 
+ * 
+ * "a book or pad with blank pages for sketching, and is frequently used 
+ * by artists for drawing or painting as a part of their creative process"
+ * 
+ */
+
+
 public interface SketchBook extends Closeable {
 	public void write(Sketch s) throws IOException;
 }

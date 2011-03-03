@@ -22,8 +22,12 @@ import java.nio.ByteBuffer;
  * 
  * @author Claudio Martella
  * 
- * This represents the new data written. A new write or an update of an existing entry.
- *
+ * this is an Update. This means both a write, or an overwrite. 
+ * 
+ * "A throw-up or "throwie" sits between a tag and a piece in terms of complexity 
+ * and time investment. It generally consists of a one-color outline and one layer 
+ * of fill-color. Throw-ups are often utilized by writers who wish to achieve a 
+ * large number of tags while competing with rival artists."
  */
 
 public class Throwup implements Sketch {

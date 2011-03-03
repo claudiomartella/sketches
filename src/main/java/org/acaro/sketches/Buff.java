@@ -21,10 +21,11 @@ import java.nio.ByteBuffer;
  * 
  * @author Claudio Martella
  * 
- * This represents a deleted value. Deleted values are purged during compaction.
- * This is what is normally known as a Tombstone in some NoSQL KV stores.
- *
+ * this is a Delete. Some NoSQLs call it Tombstone. "To remove painted 
+ * graffiti with chemicals and other instruments, or to paint over it with 
+ * a flat color."
  */
+
 public class Buff implements Sketch {
 	private final byte[] key;
 	private final long ts;

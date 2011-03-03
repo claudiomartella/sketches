@@ -34,7 +34,7 @@ import java.util.List;
 public class Sketches {
 	private MindSketches memory;
 	private SketchBook book;
-	private List<Wall> walls = new ArrayList<Wall>();
+	private List<Mural> murals = new ArrayList<Mural>();
 	private String path;
 	private String name;
 	
@@ -42,7 +42,7 @@ public class Sketches {
 		this.path = path;
 		this.name = name;
 		initSketchBook(path, name);
-		initWalls(path, name);
+		initMurals(path, name);
 	}
 	
 	public void put(byte[] key, byte[] value) throws IOException {
@@ -95,10 +95,10 @@ public class Sketches {
 		book.close();
 	}
 
-	public void burn() throws IOException {
+	public void bomb() throws IOException {
 		MindSketches oldMemory = memory;
 		memory = new MindSketches();
-		SketchesHelper.burnMindSketches(oldMemory, path+"/"+name+".br");
+		SketchesHelper.bombMindSketches(oldMemory, path+"/"+name+".br");
 	}
 	
 	private void doDelete(byte[] key) throws IOException {
@@ -111,16 +111,16 @@ public class Sketches {
 		Sketch s;
 		
 		if ((s = memory.get(key)) == null) {
-			s = wallsGet(key);
+			s = muralsGet(key);
 		}
 		
 		return s;
 	}
 	
-	private Sketch wallsGet(byte[] key) {
+	private Sketch muralsGet(byte[] key) {
 		Sketch s = null;
 		
-		for (Wall w: walls) {
+		for (Mural w: murals) {
 			if ((s = w.get(key)) != null) {
 				break;
 			}
@@ -134,8 +134,8 @@ public class Sketches {
 			throw new IllegalArgumentException("key length can not be bigger than "+ Short.MAX_VALUE);
 	}
 	
-	private void initWalls(String path, String name) {
-		walls.add(new Wall());
+	private void initMurals(String path, String name) {
+		murals.add(new Mural());
 	}
 
 	private void initSketchBook(String path, String name) throws IOException {

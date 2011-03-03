@@ -18,6 +18,15 @@ package org.acaro.sketches;
 
 import java.nio.ByteBuffer;
 
+/**
+ * 
+ * @author Claudio Martella
+ * 
+ * this is the interface for operations on the DB. You can think of it as Operation. 
+ * "a rapidly executed freehand drawing that is not intended as a finished work"
+ *
+ */
+
 public interface Sketch {
 	static final byte THROWUP = 1;
 	static final byte BUFF = 2;

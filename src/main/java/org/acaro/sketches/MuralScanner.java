@@ -15,6 +15,6 @@
 
 package org.acaro.sketches;
 
-public class WallScanner {
+public class MuralScanner {
 
 }
