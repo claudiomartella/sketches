@@ -14,15 +14,15 @@
 */
 
 
-package org.acaro.sketches;
+package org.acaro.sketches.util;
 
 public class Util {
-    static final int SIZEOF_BYTE = Byte.SIZE / Byte.SIZE;
-    static final int SIZEOF_BOOLEAN = SIZEOF_BYTE;
-    static final int SIZEOF_CHAR = Character.SIZE / Byte.SIZE;
-    static final int SIZEOF_SHORT = Short.SIZE / Byte.SIZE;
-    static final int SIZEOF_INT = Integer.SIZE / Byte.SIZE;
-    static final int SIZEOF_LONG = Long.SIZE / Byte.SIZE;
-    static final int SIZEOF_FLOAT = Float.SIZE / Byte.SIZE;
-    static final int SIZEOF_DOUBLE = Double.SIZE / Byte.SIZE;	
+    public static final int SIZEOF_BYTE = Byte.SIZE / Byte.SIZE;
+    public static final int SIZEOF_BOOLEAN = SIZEOF_BYTE;
+    public static final int SIZEOF_CHAR = Character.SIZE / Byte.SIZE;
+    public static final int SIZEOF_SHORT = Short.SIZE / Byte.SIZE;
+    public static final int SIZEOF_INT = Integer.SIZE / Byte.SIZE;
+    public static final int SIZEOF_LONG = Long.SIZE / Byte.SIZE;
+    public static final int SIZEOF_FLOAT = Float.SIZE / Byte.SIZE;
+    public static final int SIZEOF_DOUBLE = Double.SIZE / Byte.SIZE;	
 }

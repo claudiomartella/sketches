@@ -14,21 +14,26 @@
 */
 
 
-package org.acaro.sketches;
+package org.acaro.sketches.sketchbook;
 
 import java.io.BufferedOutputStream;
 import java.io.FileOutputStream;
+import java.io.Flushable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+
+import org.acaro.sketches.sketch.Sketch;
 
 public class BufferedSketchBook implements SketchBook {
-	private FileOutputStream fos;
+	private FileOutputStream file;
 	private BufferedOutputStream bos;
 	private final int bufferSize = 64*1024;
-	
+
 	public BufferedSketchBook(String filename) throws IOException {
-		fos = new FileOutputStream(filename, true);
-		bos = new BufferedOutputStream(fos, bufferSize);
+		this.file = new FileOutputStream(filename, true);
+		this.bos = new BufferedOutputStream(file, bufferSize);
+		init();
 	}
 	
 	public synchronized void write(Sketch s) throws IOException {
@@ -38,8 +43,30 @@ public class BufferedSketchBook implements SketchBook {
 	}
 
 	public synchronized void close() throws IOException {
-		bos.flush();
-		fos.getFD().sync();
+		ByteBuffer header = ByteBuffer.allocate(SketchBook.HEADER_SIZE);
+		header.put(SketchBook.CLEAN);
+		writeHeader(header);
+		sync();
 		bos.close();
+	}
+
+	public synchronized void sync() throws IOException {
+		bos.flush();
+		file.getFD().sync();
+	}
+	
+	private void init() throws IOException {
+		ByteBuffer header = ByteBuffer.allocate(SketchBook.HEADER_SIZE);
+		header.put(SketchBook.DIRTY);
+		header.putLong(0);
+		header.putInt(0);
+		writeHeader(header);
+		sync();
+	}
+	
+	private void writeHeader(ByteBuffer header) throws IOException {
+		FileChannel channel = file.getChannel();
+		channel.position(0);
+		while (channel.write(header) > 0);
 	}
 }

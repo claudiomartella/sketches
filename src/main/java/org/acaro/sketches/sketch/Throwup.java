@@ -14,7 +14,7 @@
 */
 
 
-package org.acaro.sketches;
+package org.acaro.sketches.sketch;
 
 import java.nio.ByteBuffer;
 

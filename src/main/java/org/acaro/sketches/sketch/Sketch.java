@@ -14,9 +14,11 @@
 */
 
 
-package org.acaro.sketches;
+package org.acaro.sketches.sketch;
 
 import java.nio.ByteBuffer;
+
+import org.acaro.sketches.util.Util;
 
 /**
  * 
@@ -38,5 +40,5 @@ public interface Sketch {
 	
 	public abstract ByteBuffer[] getBytes();
 	
-	public abstract int getSize();
+	public abstract int getSize();	
 }

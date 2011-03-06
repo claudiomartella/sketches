@@ -14,12 +14,14 @@
 */
 
 
-package org.acaro.sketches;
+package org.acaro.sketches.sketchbook;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+
+import org.acaro.sketches.sketch.Sketch;
 
 /**
  * 
@@ -30,45 +32,44 @@ import java.nio.channels.FileChannel;
  */
 
 public class SyncSketchBook implements SketchBook {
-	private FileOutputStream fos;
+	private FileOutputStream file;
 	private FileChannel ch;
 
 	public SyncSketchBook(String filename) throws IOException {
-		fos = new FileOutputStream(filename, true);
-		ch  = fos.getChannel();
+		this.file = new FileOutputStream(filename, true);
+		this.ch  = file.getChannel();
+		init();
 	}
 	
 	public synchronized void write(Sketch b) throws IOException {
 		ByteBuffer[] bb = b.getBytes();
 		while (ch.write(bb) > 0);
-		ch.force(false);
+		sync();
 	}
 	
 	public synchronized void close() throws IOException {
-		fos.getFD().sync();
-		fos.close();
+		ByteBuffer header = ByteBuffer.allocate(SketchBook.HEADER_SIZE);
+		header.put(SketchBook.CLEAN);
+		writeHeader(header);
+		sync();
+		file.close();
 	}
 	
-/*	private void writeFully(FileChannel ch, ByteBuffer[] bytes) throws IOException {
-		long fullLength = calculateFullLength(bytes);
-		long fullyWritten = 0;
-
-		while (fullyWritten < fullLength) {
-			long written = ch.write(bytes);
-			if (written > 0) {
-				fullyWritten += written;
-			} else  {
-				Thread.yield();
-			}
-		}
+	private void sync() throws IOException {
+		ch.force(false);
 	}
-
-	private long calculateFullLength(ByteBuffer[] bytes) {
-        long fullLength = 0;
-        
-        for (int i = 0; i < bytes.length; i++)
-        	fullLength += bytes[i].remaining();
-        
-        return fullLength;
-	}*/
+	
+	private void init() throws IOException {
+		ByteBuffer header = ByteBuffer.allocate(SketchBook.HEADER_SIZE);
+		header.put(SketchBook.DIRTY);
+		header.putLong(0);
+		header.putInt(0);
+		writeHeader(header);
+		sync();
+	}
+	
+	private void writeHeader(ByteBuffer header) throws IOException {
+		ch.position(0);
+		while (ch.write(header) > 0);
+	}
 }

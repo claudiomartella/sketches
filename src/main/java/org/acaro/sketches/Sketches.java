@@ -20,6 +20,14 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.acaro.sketches.mindsketches.MindSketches;
+import org.acaro.sketches.mural.Mural;
+import org.acaro.sketches.sketch.Buff;
+import org.acaro.sketches.sketch.Sketch;
+import org.acaro.sketches.sketch.Throwup;
+import org.acaro.sketches.sketchbook.BufferedSketchBook;
+import org.acaro.sketches.sketchbook.SketchBook;
+
 /**
  * 
  * @author Claudio Martella

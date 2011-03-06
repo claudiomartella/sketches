@@ -14,11 +14,13 @@
 */
 
 
-package org.acaro.sketches;
+package org.acaro.sketches.mindsketches;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import org.acaro.sketches.sketch.Sketch;
 
 public class MindSketches {
 	private ConcurrentHashMap<byte[], Sketch> map = new ConcurrentHashMap<byte[], Sketch>(100000);

@@ -13,26 +13,29 @@
    limitations under the License.
 */
 
-
 package org.acaro.sketches;
 
-import java.io.BufferedOutputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.BufferUnderflowException;
-import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileChannel.MapMode;
 import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map.Entry;
 import java.util.TreeMap;
 
+import org.acaro.sketches.mindsketches.MindSketches;
+import org.acaro.sketches.mural.MuralIterator;
+import org.acaro.sketches.mural.MuralWriter;
+import org.acaro.sketches.mural.MuralsCursor;
+import org.acaro.sketches.sketch.Sketch;
+import org.acaro.sketches.sketch.SketchHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.common.primitives.UnsignedBytes;
 
 /**
  * 
@@ -59,35 +62,7 @@ public class SketchesHelper {
 			buffer.load();
 			
 			while (buffer.hasRemaining()) {
-				byte type = buffer.get();
-				long ts = buffer.getLong();
-				short keySize = buffer.getShort();
-				int valueSize = buffer.getInt();
-				
-				Sketch s;
-				byte[] key, value;
-				
-				switch (type) {
-				
-				case Sketch.THROWUP: 
-
-					key = new byte[keySize];
-					value = new byte[valueSize];
-					buffer.get(key); 
-					buffer.get(value);
-					s = new Throwup(key, value, ts);
-					break;
-
-				case Sketch.BUFF:
-
-					key = new byte[keySize];
-					buffer.get(key);
-					s = new Buff(key, ts); 
-					break;
-
-				default: throw new IOException("Corrupted SketchBook: read unknown type: " + type); 
-				}
-				
+				Sketch s = SketchHelper.readItem(buffer);				
 				memory.put(s.getKey(), s);
 				loaded++;
 			}
@@ -113,92 +88,29 @@ public class SketchesHelper {
 		long start = System.currentTimeMillis();
 		logger.info("burning started: " + start);
 		
-		TreeMap<byte[], Sketch> sortedMap = new TreeMap<byte[], Sketch>(new KeyComparator());
+		TreeMap<byte[], Sketch> sortedMap = new TreeMap<byte[], Sketch>(UnsignedBytes.lexicographicalComparator());
 		sortedMap.putAll(memory.getMap());
 		logger.debug("MindSketches is sorted");
+
+		MuralWriter writer = new MuralWriter(filename);
 		
-		FileOutputStream fos = new FileOutputStream(filename, false);
-		BufferedOutputStream bos = new BufferedOutputStream(fos, 1024*1024);
-		FileChannel fc = fos.getChannel();
+		for (Sketch sketch: sortedMap.values())
+			writer.write(sketch);
 		
-		ByteBuffer header = ByteBuffer.allocate(Mural.HEADER_SIZE);
-		// this file's a work in progress
-		header.put(Mural.DIRTY);
-		header.putLong(sortedMap.size());
-		header.rewind();
-		fc.write(header);
-		
-		for (Entry<byte[], Sketch> entry: sortedMap.entrySet()) {
-			for (ByteBuffer b: entry.getValue().getBytes()) 
-				bos.write(b.array());
-		}
-		
-		// It's finished, freeze it
-		bos.flush();
-		fc.position(0);
-		header.put(0, Mural.CLEAN);
-		header.rewind();
-		fc.write(header);
-		fos.close();
-		
+		writer.close();
 		logger.info("burning finished: " + (System.currentTimeMillis()-start));
 	}
 	
-	public static void muralScriber(List<MuralScanner> muralScanners, String filename) throws IOException {
-		if (muralScanners.size() < 2) throw new IllegalArgumentException("Can't merge less than 2 murals");
-		boolean finished = false;
+	public static void scribeMurals(List<MuralIterator> muralIterators, String filename) throws IOException {
+		if (muralIterators.size() < 2) throw new IllegalArgumentException("Can't merge less than 2 Murals");
 		
-		FileOutputStream fos = new FileOutputStream(filename, false);
-		BufferedOutputStream bos = new BufferedOutputStream(fos, 1024*1024);
-		FileChannel fc = fos.getChannel();
+		MuralsCursor cursor = new MuralsCursor(muralIterators);
+		MuralWriter writer = new MuralWriter(filename);
 		
-		Mural[] murals = new Mural[muralScanners.size()];
-		murals = muralScanners.toArray(murals);
-		
-		Comparator<byte[]> comparator = new KeyComparator();
-		
-		Sketch[] sketches = new Sketch[muralScanners.size()];
-		
-		int i = 0;
-		for (MuralScanner scanner: muralScanners) {
-			if (scanner.hasNext())
-				sketches[i] = scanner.next();
-			else 
-				sketches[i] = null;
-			i++;
+		while (cursor.hasNext()) {
+			writer.write(cursor.next());
 		}
-		
-		while (!finished) {
-			Integer[] minValues = getMins(sketches, comparator);
-			
-			// write the minimum and most recent
-			for (ByteBuffer data: sketches[minValues[0]].getBytes())
-				bos.write(data.array());
-
-			// advance these scanners
-			for (int index: minValues) {
-				if (murals[index].hasNext())
-					sketches[index] = murals[index].next();
-				else
-					sketches[index] = null;
-			}
-			
-			finished = true;
-			// we have more data to compare?
-			for (Sketch sketch: sketches)
-				if (sketch != null)
-					finished = false;
-		}
-		
-		bos.flush();
-		bos.close();
-	}
-	
-	private static Integer[] getMins(Sketch[] sketches, Comparator<byte[]> comparator) {
-		List<Integer> mins = new LinkedList<Integer>();
-		byte[] minKey = sketches[0].getKey();
-		
-		
-		return (Integer[]) mins.toArray();
+		cursor.close();
+		writer.close();
 	}
 }

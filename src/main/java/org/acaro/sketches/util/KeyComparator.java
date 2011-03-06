@@ -13,7 +13,7 @@
    limitations under the License.
 */
 
-package org.acaro.sketches;
+package org.acaro.sketches.util;
 
 import java.util.Comparator;
 

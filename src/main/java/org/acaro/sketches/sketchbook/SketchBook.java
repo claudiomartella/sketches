@@ -14,10 +14,13 @@
 */
 
 
-package org.acaro.sketches;
+package org.acaro.sketches.sketchbook;
 
 import java.io.Closeable;
 import java.io.IOException;
+
+import org.acaro.sketches.sketch.Sketch;
+import org.acaro.sketches.util.Util;
 
 /**
  * @author Claudio Martella
@@ -31,5 +34,9 @@ import java.io.IOException;
 
 
 public interface SketchBook extends Closeable {
+	public static final byte CLEAN = 1;
+	public static final byte DIRTY = 2;
+	public static final int HEADER_SIZE = Util.SIZEOF_BYTE;
+	
 	public void write(Sketch s) throws IOException;
 }

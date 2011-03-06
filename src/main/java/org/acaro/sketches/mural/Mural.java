@@ -13,8 +13,10 @@
    limitations under the License.
 */
 
+package org.acaro.sketches.mural;
 
-package org.acaro.sketches;
+import org.acaro.sketches.sketch.Sketch;
+import org.acaro.sketches.util.Util;
 
 /**
  * @author Claudio Martella
@@ -27,7 +29,7 @@ package org.acaro.sketches;
 
 public class Mural {
 	//private BookIndex index;
-	public static final int HEADER_SIZE = Util.SIZEOF_BYTE+Util.SIZEOF_LONG;
+	public static final int HEADER_SIZE = Util.SIZEOF_BYTE+Util.SIZEOF_LONG+Util.SIZEOF_INT;
 	public static final byte CLEAN = 1;
 	public static final byte DIRTY = 2;
 	
