@@ -18,67 +18,115 @@ package org.acaro.sketches.mural;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Comparator;
+import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.NoSuchElementException;
 
 import org.acaro.sketches.sketch.Sketch;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.primitives.UnsignedBytes;
 
+/**
+ * 
+ * @author Claudio Martella
+ * 
+ * Iterable set of cursors. Returns element with smallest key. Expects client iterators to be sorted by time (youngest first).
+ *
+ */
+
 public class MuralsCursor implements Closeable {
-	private MuralIterator[] iterators;
-	private Comparator<byte[]> comparator = UnsignedBytes.lexicographicalComparator();
-	private Sketch[] sketches;
-	private boolean finished;
+	private static final Logger logger = LoggerFactory.getLogger(MuralsCursor.class);
+	private final Comparator<byte[]> comparator = UnsignedBytes.lexicographicalComparator();
+	private final List<MuralIterator> iterators;
+	private final List<MuralCursor> cursors;
 
 	public MuralsCursor(List<MuralIterator> iterators) throws IOException {
-		this.iterators = (MuralIterator[]) iterators.toArray();
-		sketches = new Sketch[this.iterators.length];
-		finished = advance();
+		this.iterators = iterators;
+		this.cursors = new LinkedList<MuralCursor>();
+		for (MuralIterator iterator: iterators)
+			this.cursors.add(new MuralCursor(iterator));
 	}
 	
 	public boolean hasNext() {
-		return finished;
+		return cursors.size() > 0;
 	}
 	
 	public Sketch next() throws IOException {
 		if (!hasNext()) throw new NoSuchElementException();
 		
-		Sketch minimum = getMinimum();
-		finished = advance();
-		
-		return minimum;
+		return getMinimum(); 
 	}
 
 	public void close() throws IOException {
 		for (MuralIterator iterator: iterators)
 			iterator.close();
 	}
-	
-	private Sketch getMinimum() {
-		Sketch minimum = sketches[0];
+
+	private Sketch getMinimum() throws IOException {
+		List<MuralCursor> minima = new LinkedList<MuralCursor>(); 
 		
-		for (int i = 1; i < sketches.length; i++)
-			if (comparator.compare(minimum.getKey(), sketches[i].getKey()) > 0)
-				minimum = sketches[i];
+		Iterator<MuralCursor> iter = cursors.iterator();
+		MuralCursor cursor = iter.next();
+		Sketch minimum = cursor.getValue();
+		minima.add(cursor);
+		
+		while (iter.hasNext()) {
+			cursor = iter.next();
+			int comparison = comparator.compare(minimum.getKey(), cursor.getValue().getKey()); 
+			if (comparison == 0) { 
+				// next one is a bug: iterators/cursors are sorted by time (youngest first), this shouldn't happen
+				if (cursor.getValue().getTimestamp() < minimum.getTimestamp())
+					throw new IOException("Older MuralIterator with younger data!");
+				minima.add(cursor);
+			} else if (comparison > 0) {
+				minimum = cursor.getValue();
+				minima.clear();
+				minima.add(cursor);
+			}
+		}
+		advance(minima);
 		
 		return minimum;
 	}
 	
-	private boolean advance() throws IOException {
-		boolean advanced = true;
-		int i = 0;
+	private void advance(List<MuralCursor> minima) throws IOException {
 		
-		for (MuralIterator mural: iterators) {
-			if (mural.hasNext()) {
-				sketches[i] = mural.next();
-				advanced = false;
-			} else { 
-				sketches[i] = null;
+		for (MuralCursor cursor: minima) {
+			if (cursor.hasNext()) {
+				cursor.advance();
+			} else {
+				cursors.remove(cursor);
 			}
-			i++;
+		}
+	}
+		
+	private class MuralCursor {
+		private final MuralIterator iterator;
+		private Sketch value;
+		
+		public MuralCursor(MuralIterator iterator) throws IOException {
+			this.iterator = iterator;
+			if (hasNext())
+				advance();
+			else
+				throw new IOException("Empty Mural");
 		}
 		
-		return advanced;
+		public Sketch getValue() {
+			return value;
+		}
+		
+		public void advance() throws IOException {
+			if (!hasNext()) throw new NoSuchElementException();
+			
+			value = iterator.next();
+		}
+		
+		public boolean hasNext() {
+			return iterator.hasNext();
+		}
 	}
 }

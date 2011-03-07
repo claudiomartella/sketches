@@ -20,9 +20,6 @@ import java.io.Closeable;
 import java.io.DataInputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
-import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 import org.acaro.sketches.sketch.Sketch;
@@ -54,8 +51,9 @@ public class MuralIterator implements Closeable {
 		if (!hasNext()) throw new NoSuchElementException();
 		
 		Sketch sketch = SketchHelper.readItem(data);
-		if (++readItems == totalItems)
+		if (++readItems == totalItems) {
 			file.close();
+		}
 		
 		return sketch;
 	}
