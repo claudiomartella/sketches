@@ -30,10 +30,13 @@ import org.slf4j.LoggerFactory;
 import com.google.common.primitives.UnsignedBytes;
 
 /**
+ * Iterable set of MuralIterator. Returns element with smallest key.
+ * It expects the iterators List passed to the constructor to be sorted by time.
+ * iterators[0].getTimestamp() < iterators[1].getTimestamp() < ... < iterators[n].getTimestamp()
+ * When two elements with the same key are found, the youngest is returned.
+ * The result is a live "merging" of the Murals. Used to implement Compaction.
  * 
  * @author Claudio Martella
- * 
- * Iterable set of cursors. Returns element with smallest key. Expects client iterators to be sorted by time (youngest first).
  *
  */
 
@@ -53,7 +56,10 @@ public class MuralsCursor implements Closeable {
 	public boolean hasNext() {
 		return cursors.size() > 0;
 	}
-	
+
+	/**
+	 * @return the next youngest element with the smallest key among the Murals
+	 */
 	public Sketch next() throws IOException {
 		if (!hasNext()) throw new NoSuchElementException();
 		

@@ -61,7 +61,7 @@ public class Sketches {
 		memory.put(key, t);
 	}
 	
-	public byte[] get(byte[] key) {
+	public byte[] get(byte[] key) throws IOException {
 		checkKey(key);
 		
 		Sketch s;
@@ -115,7 +115,7 @@ public class Sketches {
 		memory.put(key, b);
 	}
 	
-	private Sketch doGet(byte[] key) {
+	private Sketch doGet(byte[] key) throws IOException {
 		Sketch s;
 		
 		if ((s = memory.get(key)) == null) {
@@ -125,7 +125,7 @@ public class Sketches {
 		return s;
 	}
 	
-	private Sketch muralsGet(byte[] key) {
+	private Sketch muralsGet(byte[] key) throws IOException {
 		Sketch s = null;
 		
 		for (Mural w: murals) {
@@ -143,7 +143,7 @@ public class Sketches {
 	}
 	
 	private void initMurals(String path, String name) {
-		murals.add(new Mural());
+		//murals.add(new Mural());
 	}
 
 	private void initSketchBook(String path, String name) throws IOException {

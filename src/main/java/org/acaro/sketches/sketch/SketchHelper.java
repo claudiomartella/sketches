@@ -17,6 +17,7 @@ package org.acaro.sketches.sketch;
 
 import java.io.DataInputStream;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
@@ -59,6 +60,39 @@ public class SketchHelper {
 	}
 	
 	public static Sketch readItem(DataInputStream input) throws IOException {
+		Sketch s;
+		
+		byte type = input.readByte();
+		long ts = input.readLong();
+		short keySize = input.readShort();
+		int valueSize = input.readInt();
+		
+		byte[] key, value;
+		
+		switch (type) {
+		case Sketch.THROWUP: 
+			
+			key = new byte[keySize];
+			value = new byte[valueSize];
+			input.readFully(key);
+			input.readFully(value);
+			s = new Throwup(key, value, ts);
+			break;
+
+		case Sketch.BUFF:
+
+			key = new byte[keySize];
+			input.readFully(key);
+			s = new Buff(key, ts); 
+			break;
+
+		default: throw new IOException("Corrupted SketchBook: read unknown type: " + type); 
+		}
+		
+		return s;
+	}
+	
+	public static Sketch readItem(RandomAccessFile input) throws IOException {
 		Sketch s;
 		
 		byte type = input.readByte();

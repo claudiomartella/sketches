@@ -44,6 +44,7 @@ public class MuralWriter implements Closeable {
 		header.put(Mural.DIRTY);
 		header.putLong(0);
 		header.putInt(0);
+		header.putLong(0);
 		writeHeader(header);
 		sync();
 	}
