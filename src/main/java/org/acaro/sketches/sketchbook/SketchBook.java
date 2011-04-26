@@ -30,12 +30,18 @@ import org.acaro.sketches.util.Util;
  * "a book or pad with blank pages for sketching, and is frequently used 
  * by artists for drawing or painting as a part of their creative process"
  * 
+ * Format:
+ * +----------+------+   +------+
+ * |     1    |   N  |   |   N  |
+ * |Dirty Byte|Sketch|...|Sketch|
+ * +----------+------+   +------+ 
+ * 
  */
 
 
 public interface SketchBook extends Closeable {
-	public static final byte CLEAN = 1;
-	public static final byte DIRTY = 2;
+	public static final byte CLEAN = 0;
+	public static final byte DIRTY = 1;
 	public static final int HEADER_SIZE = Util.SIZEOF_BYTE;
 	
 	public void write(Sketch s) throws IOException;

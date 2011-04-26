@@ -62,8 +62,6 @@ public class SyncSketchBook implements SketchBook {
 	private void init() throws IOException {
 		ByteBuffer header = ByteBuffer.allocate(SketchBook.HEADER_SIZE);
 		header.put(SketchBook.DIRTY);
-		header.putLong(0);
-		header.putInt(0);
 		writeHeader(header);
 		sync();
 	}

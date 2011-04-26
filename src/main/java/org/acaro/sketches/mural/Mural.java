@@ -17,48 +17,62 @@ package org.acaro.sketches.mural;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.io.RandomAccessFile;
+import java.nio.channels.FileChannel.MapMode;
 
 import org.acaro.sketches.sketch.Buff;
 import org.acaro.sketches.sketch.Sketch;
 import org.acaro.sketches.sketch.SketchHelper;
 import org.acaro.sketches.sketch.Throwup;
+import org.acaro.sketches.util.BufferedRandomAccessFile;
+import org.acaro.sketches.util.MurmurHash3;
 import org.acaro.sketches.util.Util;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
- * It's an immutable sorted list.This is where immutable sketches go. 
+ * It's an immutable sorted list. This is where immutable Sketches go. 
  * Data in these files can't be overwritten. Think of it as SequenceFile.
  * The MuralIndex is used to locate the offset of the data. 
  * 
  * "A large and labor-intensive graffiti painting."
+ * 
  * @author Claudio Martella
  * 
  */
 
 public class Mural implements Closeable {
+	private static final Logger logger = LoggerFactory.getLogger(Mural.class);
 	//									  dirty byte      - timestamp      - #items        - index offset
 	public static final int HEADER_SIZE = Util.SIZEOF_BYTE+Util.SIZEOF_LONG+Util.SIZEOF_INT+Util.SIZEOF_LONG;
-	public static final byte CLEAN = 1;
-	public static final byte DIRTY = 2;
-	private MuralIndex index;
-	private RandomAccessFile file;
-	private byte dirty;
+	public static final int BUCKET_ITEM_SIZE = Util.SIZEOF_LONG;
+	public static final byte CLEAN = 0;
+	public static final byte DIRTY = 1;
+	private Index index;
+	private BufferedRandomAccessFile file;
+	private byte dirtyByte;
 	private long timestamp;
 	private int numberOfItems;
 	private long indexOffset;
 	
 	public Mural(String muralFilename) throws IOException {
-		this.file = new RandomAccessFile(muralFilename, "r");
+		this.file = new BufferedRandomAccessFile(muralFilename, "r");
 		readHeader();
-		this.index = new MuralIndex(this.file, numberOfItems, indexOffset);
+		this.index = new SmallIndex(this.file.getChannel(), MapMode.READ_ONLY, indexOffset, this.file.length()-indexOffset);
 	}
 	
 	public Sketch get(byte[] key) throws IOException {
 		Sketch s = null;
-		
-		long offset = index.get(key);
-		if (offset > 0) {
-			s = getData(offset);
+
+		long offset = getBucket(key);
+		if (offset == 0) { // empty bucket
+			logger.debug("empty bucket");
+			s = null;
+		} else if (offset < indexOffset) { // direct link to data
+			//logger.debug("direct link to data");
+			s = getSketch(offset);
+		} else { // search in bucket
+			//logger.debug("link to bucket");
+			s = searchSketch(offset-indexOffset, key); 
 		}
 		
 		return s;
@@ -69,7 +83,7 @@ public class Mural implements Closeable {
 	}
 	
 	public byte getDirtyByte() {
-		return this.dirty;
+		return this.dirtyByte;
 	}
 	
 	public long getTimestamp() {
@@ -84,17 +98,39 @@ public class Mural implements Closeable {
 		return this.indexOffset;
 	}
 	
-	private Sketch getData(long offset) throws IOException {
+	private long getBucket(byte[] key) {
+		return index.getOffset(calculateBucket(key) * Util.SIZEOF_LONG);
+	}
+	
+	private int calculateBucket(byte[] key) {
+		return Math.abs(MurmurHash3.hash(key)) % numberOfItems;
+	}
+	
+	private Sketch getSketch(long offset) throws IOException {
 		file.seek(offset);
 		
 		return SketchHelper.readItem(file);
 	}
 	
+	private Sketch searchSketch(long offset, byte[] key) throws IOException {
+		Sketch s = null;
+		index.position(offset);
+		
+		long dataOffset;
+		while ((dataOffset = index.getOffset()) != 0) {
+			s = getSketch(dataOffset);
+			if (s.getKey().equals(key))
+				break;
+		}
+		
+		return s;
+	}
+	
 	private void readHeader() throws IOException {
-		dirty = file.readByte();
-		timestamp = file.readLong();
+		dirtyByte     = file.readByte(); // should handle DIRTY file
+		timestamp     = file.readLong();
 		numberOfItems = file.readInt();
-		indexOffset = file.readLong();		
+		indexOffset   = file.readLong();		
 	}
 	
 	public static void main(String[] args) throws IOException {

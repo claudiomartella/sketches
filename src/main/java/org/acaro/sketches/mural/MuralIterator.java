@@ -45,13 +45,14 @@ public class MuralIterator implements Closeable {
 	private long timestamp;
 	private int totalItems, readItems = 0;
 	private byte dirty;
+	private long indexOffset;
 	private long position = Mural.HEADER_SIZE;
 	private int lastElementSize = 0;
 		
 	public MuralIterator(String filename) throws IOException {
 		this.filename = filename;
 		this.file = new FileInputStream(filename);
-		this.data = new DataInputStream(new BufferedInputStream(file));
+		this.data = new DataInputStream(new BufferedInputStream(file, 65536));
 		init();
 	}
 	
@@ -79,6 +80,10 @@ public class MuralIterator implements Closeable {
 		return position-lastElementSize;
 	}
 	
+	public long getIndexOffset() {
+		return this.indexOffset;
+	}
+	
 	public long getTimestamp() {
 		return this.timestamp;
 	}
@@ -97,6 +102,7 @@ public class MuralIterator implements Closeable {
 			logger.info("Mural is dirty: " + filename);
 		this.timestamp = data.readLong();
 		this.totalItems = data.readInt();
+		this.indexOffset = data.readLong();
 	}
 	
 	private void updateOffset(int size) {
@@ -110,7 +116,7 @@ public class MuralIterator implements Closeable {
 			System.exit(-1);
 		}
 		
-		MuralIterator iterator = new MuralIterator(args[1]);
+		MuralIterator iterator = new MuralIterator(args[0]);
 		while (iterator.hasNext()) {
 			Sketch s = iterator.next();
 			if (s instanceof Buff)

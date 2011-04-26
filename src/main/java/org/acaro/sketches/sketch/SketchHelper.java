@@ -139,7 +139,7 @@ public class SketchHelper {
 		switch (type) {
 		
 		case Sketch.THROWUP: 
-			
+
 			key = ByteBuffer.allocate(keySize);
 			value = ByteBuffer.allocate(valueSize);
 			ByteBuffer[] payload = { key , value };

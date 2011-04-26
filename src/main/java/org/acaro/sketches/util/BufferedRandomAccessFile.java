@@ -1,11 +1,8 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/* Copyright 2011 Claudio Martella
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,7 +11,8 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */
+*/
+
 package org.acaro.sketches.util;
 
 import java.io.File;
@@ -24,20 +22,16 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 
 /**
- * A <code>BufferedRandomAccessFile</code> is like a
- * <code>RandomAccessFile</code>, but it uses a private buffer so that most
- * operations do not require a disk access.
- * <P>
  * 
- * Note: The operations on this class are unmonitored. Also, the correct
- * functioning of the <code>RandomAccessFile</code> methods that are not
- * overridden here relies on the implementation of those methods in the
- * superclass.
+ * @author Claudio Martella
+ * 
+ * Implementation based on BufferedRandomAccessFile from Apache Cassandra 0.6
+ * Adapted to Sketches: removed the SkipCache and Marking etc.
+ * 
+ * Implements buffering through a read-ahead policy.
+ *
  */
 public class BufferedRandomAccessFile extends RandomAccessFile {
-    // absolute filesystem path to the file
-    private final String filePath;
-
     // default buffer size, 64Kb
     public static final int DEFAULT_BUFFER_SIZE = 65535;
 
@@ -54,8 +48,7 @@ public class BufferedRandomAccessFile extends RandomAccessFile {
     private long bufferOffset, bufferEnd, current = 0;
 
     // max buffer size is set according to (int size) parameter in the
-    // constructor
-    // or in directIO() method to the DEFAULT_DIRECT_BUFFER_SIZE
+    // constructor or in directIO() method to the DEFAULT_DIRECT_BUFFER_SIZE
     private long maxBufferSize;
 
     // constant, used for caching purpose, -1 if file is open in "rw" mode
@@ -64,12 +57,10 @@ public class BufferedRandomAccessFile extends RandomAccessFile {
 
     // channel liked with the file, used to retrieve data and force updates.
     private final FileChannel channel;
+    
+    // access to File representation
+    private final File file;
 
-    /*
-     * Open a new <code>BufferedRandomAccessFile</code> on the file named
-     * <code>name</code> in mode <code>mode</code>, which should be "r" for
-     * reading only, or "rw" for reading and writing.
-     */
     public BufferedRandomAccessFile(String name, String mode) throws IOException {
         this(new File(name), mode, 0);
     }
@@ -78,30 +69,17 @@ public class BufferedRandomAccessFile extends RandomAccessFile {
         this(new File(name), mode, bufferSize);
     }
 
-    /*
-     * Open a new <code>BufferedRandomAccessFile</code> on <code>file</code> in
-     * mode <code>mode</code>, which should be "r" for reading only, or "rw" for
-     * reading and writing.
-     */
     public BufferedRandomAccessFile(File file, String mode) throws IOException {
         this(file, mode, 0);
     }
 
     public BufferedRandomAccessFile(File file, String mode, int bufferSize) throws IOException {
-        this(file, mode, bufferSize, false);
-    }
-
-    public BufferedRandomAccessFile(File file, String mode, int bufferSize, boolean skipCache) throws IOException {
         super(file, mode);
 
+        this.file = file;
         channel = super.getChannel();
-        filePath = file.getAbsolutePath();
-
         maxBufferSize = Math.max(bufferSize, DEFAULT_BUFFER_SIZE);
-
-        // allocating required size of the buffer
         buffer = ByteBuffer.allocate((int) maxBufferSize);
-
         // if in read-only mode, caching file size
         fileLength = (mode.equals("r")) ? this.channel.size() : -1;
         bufferEnd = reBuffer(); // bufferBottom equals to the bytes read
@@ -110,22 +88,18 @@ public class BufferedRandomAccessFile extends RandomAccessFile {
     public void sync() throws IOException {
         if (syncNeeded) {
             flush();
-
-            channel.force(true); // true, because file length counts as
-                                 // "meta-data"
+            channel.force(true);
             syncNeeded = false;
         }
     }
 
     public void flush() throws IOException {
         if (isDirty) {
-            if (channel.position() != bufferOffset)
+            if (channel.position() != bufferOffset) {
                 channel.position(bufferOffset);
-
+            }
             int lengthToWrite = (int) (bufferEnd - bufferOffset);
-
             super.write(buffer.array(), 0, lengthToWrite);
-
             isDirty = false;
         }
     }
@@ -139,17 +113,13 @@ public class BufferedRandomAccessFile extends RandomAccessFile {
             buffer.rewind();
             bufferEnd = bufferOffset;
             hitEOF = true;
-
             return 0;
         }
 
-        channel.position(bufferOffset); // setting channel position
-        long bytesRead = channel.read(buffer); // reading from that position
-
-        hitEOF = (bytesRead < maxBufferSize); // buffer is not fully loaded with
-                                              // data
+        channel.position(bufferOffset);
+        long bytesRead = channel.read(buffer);
+        hitEOF = (bytesRead < maxBufferSize);
         bufferEnd = bufferOffset + bytesRead;
-
         buffer.rewind();
 
         return bytesRead;
@@ -157,8 +127,7 @@ public class BufferedRandomAccessFile extends RandomAccessFile {
 
     @Override
     // -1 will be returned if EOF is reached, RandomAccessFile is responsible
-    // for
-    // throwing EOFException
+    // for throwing EOFException
     public int read() throws IOException {
         if (isEOF())
             return -1; // required by RandomAccessFile
@@ -183,8 +152,7 @@ public class BufferedRandomAccessFile extends RandomAccessFile {
 
     @Override
     // -1 will be returned if EOF is reached, RandomAccessFile is responsible
-    // for
-    // throwing EOFException
+    // for throwing EOFException
     public int read(byte[] buff, int offset, int length) throws IOException {
         int bytesCount = 0;
 
@@ -202,7 +170,7 @@ public class BufferedRandomAccessFile extends RandomAccessFile {
     }
 
     private int readAtMost(byte[] buff, int offset, int length) throws IOException {
-        if (length >= bufferEnd && hitEOF)
+        if (length > bufferEnd && hitEOF)
             return -1;
 
         final int left = (int) maxBufferSize - buffer.position();
@@ -306,10 +274,6 @@ public class BufferedRandomAccessFile extends RandomAccessFile {
         return bufferOffset + buffer.position();
     }
 
-    public String getPath() {
-        return filePath;
-    }
-
     public boolean isEOF() throws IOException {
         return getFilePointer() == length();
     }
@@ -324,5 +288,9 @@ public class BufferedRandomAccessFile extends RandomAccessFile {
         buffer = null;
 
         super.close();
+    }
+    
+    public File getFile() {
+    	return this.file;
     }
 }

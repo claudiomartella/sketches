@@ -1,4 +1,4 @@
-/*Copyright 2011 Claudio Martella
+/* Copyright 2011 Claudio Martella
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -58,8 +58,6 @@ public class BufferedSketchBook implements SketchBook {
 	private void init() throws IOException {
 		ByteBuffer header = ByteBuffer.allocate(SketchBook.HEADER_SIZE);
 		header.put(SketchBook.DIRTY);
-		header.putLong(0);
-		header.putInt(0);
 		writeHeader(header);
 		sync();
 	}

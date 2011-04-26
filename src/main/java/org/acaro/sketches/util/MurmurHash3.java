@@ -237,14 +237,20 @@ public class MurmurHash3 {
       return (int) (MurmurHash3_x64_128(key, seed)[0] >>> 32);
    }
 
+   /**
+    * Hashes a byte array efficiently.
+    * 
+    * @param payload a byte array to hash
+    * @return a hash code for the byte array
+    */
    public static int hash(byte[] payload) {
       return MurmurHash3_x64_32(payload, 9001);
    }
 
    /**
-    * Hashes a byte array efficiently.
+    * Hashes a long array efficiently.
     * 
-    * @param payload a byte array to hash
+    * @param payload a long array to hash
     * @return a hash code for the byte array
     */
    public static int hash(long[] payload) {

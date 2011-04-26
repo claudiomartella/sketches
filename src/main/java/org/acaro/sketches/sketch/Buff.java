@@ -24,6 +24,11 @@ import java.nio.ByteBuffer;
  * this is a Delete. Some NoSQLs call it Tombstone. "To remove painted 
  * graffiti with chemicals and other instruments, or to paint over it with 
  * a flat color."
+ * 
+ * +----+---------+--------+---+
+ * |  1 |    8    |    2   | N |
+ * |Type|Timestamp|Key size|Key|
+ * +----+---------+--------+---+
  */
 
 public class Buff implements Sketch {
@@ -32,14 +37,14 @@ public class Buff implements Sketch {
 	private byte[] header;
 	
 	public Buff(byte[] key){
-		this.key    = key;
-		this.ts = System.currentTimeMillis();
+		this.key = key;
+		this.ts  = System.currentTimeMillis();
 		initHeader();
 	}
 	
 	public Buff(byte[] key, long ts) {
-		this.key    = key;
-		this.ts		= ts;
+		this.key = key;
+		this.ts	 = ts;
 		initHeader();	
 	}
 
@@ -61,8 +66,12 @@ public class Buff implements Sketch {
 		return this.ts;
 	}
 	
+	public String toString() {
+		return "Buff key: " + this.key + " ts: " + this.ts;
+	}
+	
 	private void initHeader() {
-		this.header = ByteBuffer.allocate(HEADER_SIZE).put(THROWUP)
+		this.header = ByteBuffer.allocate(HEADER_SIZE).put(BUFF)
 		.putLong(ts)
 		.putShort((short) key.length)
 		.putInt(0)

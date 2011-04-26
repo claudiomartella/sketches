@@ -28,6 +28,11 @@ import java.nio.ByteBuffer;
  * and time investment. It generally consists of a one-color outline and one layer 
  * of fill-color. Throw-ups are often utilized by writers who wish to achieve a 
  * large number of tags while competing with rival artists."
+ * 
+ * +----+---------+--------+----------+---+-----+
+ * |  1 |    8    |   2    |    4     | N |  N  |
+ * |Type|Timestamp|Key size|Value size|Key|Value|
+ * +----+---------+--------+----------+---+-----+
  */
 
 public class Throwup implements Sketch {
@@ -70,6 +75,10 @@ public class Throwup implements Sketch {
 
 	public long getTimestamp() {
 		return this.ts;
+	}
+	
+	public String toString() {
+		return "Throwup key: " + this.key + " value: " + this.value + " ts: " + this.ts;
 	}
 	
 	private void initHeader() {
