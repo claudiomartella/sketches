@@ -15,7 +15,7 @@ public class IndexReader {
 		RandomAccessFile file = new RandomAccessFile("./resources/test1.br", "r");
 		MuralIterator iterator = new MuralIterator("./resources/test1.br");
 		Index index = new SmallIndex(file.getChannel(), MapMode.READ_ONLY, iterator.getIndexOffset(), file.length()-iterator.getIndexOffset());
-		
+		System.out.println(iterator.getIndexOffset());
 		System.out.println(index.getOffset((Math.abs(MurmurHash3.hash(T5MInserter.intToByteArray(951)))%iterator.getNumberOfItems())*8));
 		iterator.close();
 		file.close();
