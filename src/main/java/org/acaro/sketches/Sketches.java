@@ -27,6 +27,8 @@ import org.acaro.sketches.sketch.Throwup;
 import org.acaro.sketches.sketchbook.BufferedSketchBook;
 import org.acaro.sketches.sketchbook.SketchBook;
 
+import com.google.common.base.Preconditions;
+
 /**
  * 
  * @author Claudio Martella
@@ -35,6 +37,8 @@ import org.acaro.sketches.sketchbook.SketchBook;
  * 
  * Important: Both the key and the value should be immutable. 
  * We are not going to change them, we expect you to do the same.
+ * 
+ * TODO: add Preconditions accordingly
  *
  */
 
@@ -137,8 +141,7 @@ public class Sketches {
 	}
 	
 	private void checkKey(byte[] key) {
-		if (key.length > Short.MAX_VALUE) 
-			throw new IllegalArgumentException("key length can not be bigger than "+ Short.MAX_VALUE);
+		Preconditions.checkArgument(key.length <= Short.MAX_VALUE, "key length can not be bigger than %d", Short.MAX_VALUE);
 	}
 	
 	private void initMurals(String path, String name) {

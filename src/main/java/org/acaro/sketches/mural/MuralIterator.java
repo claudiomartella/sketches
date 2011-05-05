@@ -52,7 +52,7 @@ public class MuralIterator implements Closeable {
 	public MuralIterator(String filename) throws IOException {
 		this.filename = filename;
 		this.file = new FileInputStream(filename);
-		this.data = new DataInputStream(new BufferedInputStream(file, 65536));
+		this.data = new DataInputStream(new BufferedInputStream(file, 65535));
 		init();
 	}
 	
@@ -65,9 +65,8 @@ public class MuralIterator implements Closeable {
 		
 		Sketch sketch = SketchHelper.readItem(data);
 		updateOffset(sketch.getSize());
-		if (++readItems == totalItems) {
+		if (++readItems == totalItems)
 			file.close();
-		}
 		
 		return sketch;
 	}
@@ -100,8 +99,8 @@ public class MuralIterator implements Closeable {
 		this.dirty = data.readByte();
 		if (dirty == Mural.DIRTY)
 			logger.info("Mural is dirty: " + filename);
-		this.timestamp = data.readLong();
-		this.totalItems = data.readInt();
+		this.timestamp   = data.readLong();
+		this.totalItems  = data.readInt();
 		this.indexOffset = data.readLong();
 	}
 	

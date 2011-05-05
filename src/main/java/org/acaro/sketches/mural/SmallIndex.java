@@ -8,12 +8,13 @@ import java.nio.channels.FileChannel.MapMode;
 import org.acaro.sketches.util.Util;
 
 public class SmallIndex implements Index {
+	private static final long PAGE_SIZE = Integer.MAX_VALUE - 7;
 	private MappedByteBuffer buffer;
 	private int length;
 
 	public SmallIndex(FileChannel channel, MapMode mode, long start, long length) throws IOException {
-		if (length >= Integer.MAX_VALUE) 
-			throw new IllegalArgumentException("length should be smaller than Integer.MAX_VALUE.");
+		if (length >= PAGE_SIZE) 
+			throw new IllegalArgumentException("length should be smaller than " + PAGE_SIZE);
 		this.length = (int) length;
 		this.buffer = channel.map(mode, start, (int) length);
 	}
@@ -28,7 +29,7 @@ public class SmallIndex implements Index {
 	}
 
 	public long position() {
-		return this.position();
+		return buffer.position();
 	}
 
 	public Index position(long position) {

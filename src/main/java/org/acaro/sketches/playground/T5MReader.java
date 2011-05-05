@@ -18,9 +18,11 @@ public class T5MReader {
 			totalTime += (System.currentTimeMillis()-start);
 			if (s == null)
 				System.out.println(i + ": item not found!");
-			//else if (!s.getKey().equals(key))
-			//	System.out.println(i + ": wrong item, key mismatch: " + byteArrayToInt(s.getKey()));
-
+			else {
+				int b = T5MInserter.byteArrayToInt(s.getKey());
+				if (b != i)
+					System.out.println(i + ": wrong item, key mismatch: " + b);
+			}
 		}
 		
 		System.out.println("Totaltime: " + (double) totalTime);
