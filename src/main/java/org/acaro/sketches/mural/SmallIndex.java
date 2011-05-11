@@ -6,15 +6,20 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.FileChannel.MapMode;
 
 import org.acaro.sketches.util.Util;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.google.common.base.Preconditions;
 
 public class SmallIndex implements Index {
+	private static final Logger logger = LoggerFactory.getLogger(SmallIndex.class);
 	private static final long PAGE_SIZE = Integer.MAX_VALUE - 7;
 	private MappedByteBuffer buffer;
 	private int length;
 
 	public SmallIndex(FileChannel channel, MapMode mode, long start, long length) throws IOException {
-		if (length >= PAGE_SIZE) 
-			throw new IllegalArgumentException("length should be smaller than " + PAGE_SIZE);
+		Preconditions.checkArgument(length < PAGE_SIZE, "length should be smaller than %s", PAGE_SIZE);
+		
 		this.length = (int) length;
 		this.buffer = channel.map(mode, start, (int) length);
 	}
@@ -62,9 +67,7 @@ public class SmallIndex implements Index {
 	}
 	
 	private void checkPosition(long position) {
-		if (position % Util.SIZEOF_LONG != 0) 
-			throw new IllegalArgumentException("illegal position: " + position + ". It should be dividable by the size of long.");
-		if (position >= length || position < 0) 
-			throw new IndexOutOfBoundsException("position: " + position + " length: " + length);
-	}
+		Preconditions.checkArgument(position % Util.SIZEOF_LONG == 0, "illegal position: %s. It should be dividable by the size of long.", position);
+		Preconditions.checkArgument(position < length && position >= 0, "position: %s length: %s", position, length);
+	}	
 }

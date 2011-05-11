@@ -31,14 +31,13 @@ import com.google.common.base.Preconditions;
 
 /**
  * 
- * @author Claudio Martella
  * 
  * The class is the entry point to the KV store.
  * 
  * Important: Both the key and the value should be immutable. 
  * We are not going to change them, we expect you to do the same.
- * 
- * TODO: add Preconditions accordingly
+
+ * @author Claudio Martella
  *
  */
 
@@ -57,7 +56,9 @@ public class Sketches {
 	}
 	
 	public void put(byte[] key, byte[] value) throws IOException {
-		checkKey(key);
+		Preconditions.checkNotNull(key);
+		Preconditions.checkNotNull(value);
+		Preconditions.checkArgument(key.length <= Short.MAX_VALUE, "key length can not be bigger than %s", Short.MAX_VALUE);
 		
 		Throwup t = new Throwup(key, value);
 		book.write(t);
@@ -65,7 +66,8 @@ public class Sketches {
 	}
 	
 	public byte[] get(byte[] key) throws IOException {
-		checkKey(key);
+		Preconditions.checkNotNull(key);
+		Preconditions.checkArgument(key.length <= Short.MAX_VALUE, "key length can not be bigger than %s", Short.MAX_VALUE);
 		
 		Sketch s;
 		byte[] value = null;
@@ -82,7 +84,8 @@ public class Sketches {
 	}
 	
 	public byte[] getAndDelete(byte[] key) throws IOException {
-		checkKey(key);
+		Preconditions.checkNotNull(key);
+		Preconditions.checkArgument(key.length <= Short.MAX_VALUE, "key length can not be bigger than %s", Short.MAX_VALUE);
 		
 		Sketch s;
 		byte[] value = null;
@@ -97,7 +100,8 @@ public class Sketches {
 	}
 	
 	public void delete(byte[] key) throws IOException {
-		checkKey(key);
+		Preconditions.checkNotNull(key);
+		Preconditions.checkArgument(key.length <= Short.MAX_VALUE, "key length can not be bigger than %s", Short.MAX_VALUE);
 		
 		doDelete(key);
 	}
@@ -138,10 +142,6 @@ public class Sketches {
 		}
 		
 		return s;
-	}
-	
-	private void checkKey(byte[] key) {
-		Preconditions.checkArgument(key.length <= Short.MAX_VALUE, "key length can not be bigger than %d", Short.MAX_VALUE);
 	}
 	
 	private void initMurals(String path, String name) {

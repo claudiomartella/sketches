@@ -7,6 +7,8 @@ import java.nio.channels.FileChannel.MapMode;
 
 import org.acaro.sketches.util.Util;
 
+import com.google.common.base.Preconditions;
+
 /**
  * 
  * @author Claudio Martella
@@ -100,9 +102,7 @@ public class BigIndex implements Index {
 	}
 	
 	private void checkPosition(long position) {
-		if (position % Util.SIZEOF_LONG != 0) 
-			throw new IllegalArgumentException("illegal position: " + position + ". It should be dividable by the size of long.");
-		if (position >= length || position < 0) 
-			throw new IndexOutOfBoundsException("position: " + position + " length: " + length);
-	}
+		Preconditions.checkArgument(position % Util.SIZEOF_LONG == 0, "illegal position: %s. It should be dividable by the size of long.", position);
+		Preconditions.checkArgument(position < length && position >= 0, "position: %s length: %s", position, length);
+	}	
 }

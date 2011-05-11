@@ -22,6 +22,8 @@ import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 
+import org.acaro.sketches.io.SmartReader;
+
 
 public class SketchHelper {
 
@@ -157,6 +159,39 @@ public class SketchHelper {
 		default: throw new IOException("Corrupted SketchBook: read unknown type: " + type); 
 		}
 	
+		return s;
+	}
+	
+	public static Sketch readItem(SmartReader input) throws IOException {
+		Sketch s;
+		
+		byte type = input.readByte();
+		long ts = input.readLong();
+		short keySize = input.readShort();
+		int valueSize = input.readInt();
+		
+		byte[] key, value;
+		
+		switch (type) {
+		case Sketch.THROWUP: 
+			
+			key = new byte[keySize];
+			value = new byte[valueSize];
+			input.read(key);
+			input.read(value);
+			s = new Throwup(key, value, ts);
+			break;
+
+		case Sketch.BUFF:
+
+			key = new byte[keySize];
+			input.read(key);
+			s = new Buff(key, ts); 
+			break;
+
+		default: throw new IOException("Corrupted SketchBook: read unknown type: " + type); 
+		}
+		
 		return s;
 	}
 }

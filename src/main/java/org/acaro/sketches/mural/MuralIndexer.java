@@ -19,20 +19,21 @@ import org.acaro.sketches.util.Util;
 
 public class MuralIndexer implements Callable<String> {
 	private MuralIterator muralIterator;
-	private BufferedRandomAccessFile file;
-	private BufferedRandomAccessFile tfile;
+	private RandomAccessFile file;
+	private RandomAccessFile tfile;
 	private SmartWriter writer;
+	private SmartWriter twriter;
+	private SmartReader treader;
 	private Index buckets;
 	private int numberOfItems;
 	private long indexOffset;
-	private SmartWriter twriter;
-	private SmartReader treader;
+
 
 	public MuralIndexer(String muralFilename) throws IOException {
 		this.muralIterator = new MuralIterator(muralFilename);
 		this.numberOfItems = muralIterator.getNumberOfItems();
-		this.file    = new BufferedRandomAccessFile(muralFilename, "rw");
-		this.tfile   = new BufferedRandomAccessFile(muralFilename + ".tmp", "rw");
+		this.file    = new RandomAccessFile(muralFilename, "rw");
+		this.tfile   = new RandomAccessFile(muralFilename + ".tmp", "rw");
 		this.writer  = new SmartWriter(this.file.getChannel());
 		this.twriter = new SmartWriter(this.tfile.getChannel());
 		this.indexOffset = file.length(); 
@@ -41,6 +42,9 @@ public class MuralIndexer implements Callable<String> {
 
 	public String call() throws IOException {
 		fillBuckets();
+//		close();
+//		System.exit(-1);
+		
 		compactBuckets();
 
 		close();
@@ -54,7 +58,6 @@ public class MuralIndexer implements Callable<String> {
 		writer.flush();
 		file.seek(0);
 		file.writeByte(Mural.CLEAN);
-		file.flush();
 		file.getFD().sync();
 		file.close();
 		tfile.close();
@@ -78,10 +81,10 @@ public class MuralIndexer implements Callable<String> {
 			long offset   = buckets.getOffset();
 			if (offset >= indexOffset) { // get it from tempfile
 				TBucketIterator tbucket = new TBucketIterator(offset - indexOffset);
-				buckets.putOffset(position, writer.getFilePointer());
+				buckets.putOffset(position, writer.getFilePointer()); // head of the list
 				while (tbucket.hasNext())
 					writer.writeLong(tbucket.next());
-				writer.writeLong(0);
+				writer.writeLong(0); // end of the list
 			}
 		}
 	}
@@ -122,7 +125,7 @@ public class MuralIndexer implements Callable<String> {
 	}
 
 	private long writeTItem(long prev, long offset) throws IOException {
-		long position = tfile.getFilePointer();
+		long position = twriter.getFilePointer();
 		
 		twriter.writeLong(prev);
 		twriter.writeLong(offset);
@@ -137,13 +140,11 @@ public class MuralIndexer implements Callable<String> {
 	
 	private void writeHeader() throws IOException {
 		tfile.writeByte(Mural.DIRTY);
-		tfile.flush();
 		tfile.getFD().sync();
 		file.seek(0);
 		file.writeByte(Mural.DIRTY);
 		file.skipBytes(Util.SIZEOF_LONG+Util.SIZEOF_INT);
 		file.writeLong(indexOffset);
-		file.flush();
 		file.getFD().sync();
 	}
 	

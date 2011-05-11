@@ -86,11 +86,6 @@ public class SmartReader {
 	
 	public long readLong() throws IOException {
 		checkAvailability(Util.SIZEOF_LONG);
-//		System.out.println("position: " + buffer.position());
-//		System.out.println("limit: " + buffer.limit());
-//		System.out.println("capacity: " + buffer.capacity());
-//		System.out.println("remaining: " + buffer.remaining());
-//		System.out.println("left:" + left);
 		return buffer.getLong();
 	}
 	
@@ -139,12 +134,6 @@ public class SmartReader {
 	}
 	
 	private void checkAvailability(int size) throws IOException {
-//		System.out.println("position: " + buffer.position());
-//		System.out.println("limit: " + buffer.limit());
-//		System.out.println("capacity: " + buffer.capacity());
-//		System.out.println("remaining: " + buffer.remaining());
-//		System.out.println("hitEOF: " + hitEOF);
-//		System.out.println("size: " + size);
 		if (buffer.remaining() >= size) 
 			return;
 		if (buffer.remaining() < size && !hitEOF)

@@ -18,7 +18,9 @@ package org.acaro.sketches.mural;
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.channels.FileChannel.MapMode;
+import java.util.Arrays;
 
+import org.acaro.sketches.playground.T5MInserter;
 import org.acaro.sketches.sketch.Buff;
 import org.acaro.sketches.sketch.Sketch;
 import org.acaro.sketches.sketch.SketchHelper;
@@ -48,10 +50,10 @@ public class Mural implements Closeable, Comparable<Mural> {
 	public static final byte DIRTY = 1;
 	private Index index;
 	private BufferedRandomAccessFile file;
-	private byte dirtyByte;
 	private long timestamp;
-	private int numberOfItems;
 	private long indexOffset;
+	private byte dirtyByte;
+	private int numberOfItems;
 	
 	public Mural(String muralFilename) throws IOException {
 		this.file = new BufferedRandomAccessFile(muralFilename, "r");
@@ -63,13 +65,16 @@ public class Mural implements Closeable, Comparable<Mural> {
 		Sketch s;
 
 		long offset = getBucket(key);
-		if (offset == 0) // empty bucket
+		if (offset == 0) {// empty bucket
+			//logger.debug("empty bucket");
 			s = null;
-		else if (offset < indexOffset) // direct link to data
+		} else if (offset < indexOffset) {// direct link to data
+			//logger.debug("got it directly");
 			s = getSketch(offset);
-		else // search in bucket
+		} else { // search in bucket
+			//logger.debug("searching in the list");
 			s = searchSketch(offset - indexOffset, key); 
-		
+		}
 		return s;
 	}
 	
@@ -124,7 +129,8 @@ public class Mural implements Closeable, Comparable<Mural> {
 		long dataOffset;
 		while ((dataOffset = index.getOffset()) != 0) {
 			Sketch t = getSketch(dataOffset);
-			if (t.getKey().equals(key))
+			
+			if (Arrays.equals(t.getKey(), key))
 				return t;
 		}
 		
