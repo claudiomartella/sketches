@@ -17,6 +17,7 @@ package org.acaro.sketches.mural;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel.MapMode;
 import java.util.Arrays;
 
@@ -25,7 +26,7 @@ import org.acaro.sketches.sketch.Buff;
 import org.acaro.sketches.sketch.Sketch;
 import org.acaro.sketches.sketch.SketchHelper;
 import org.acaro.sketches.sketch.Throwup;
-import org.acaro.sketches.io.BufferedRandomAccessFile;
+import org.acaro.sketches.io.SmartReader;
 import org.acaro.sketches.util.MurmurHash3;
 import org.acaro.sketches.util.Util;
 import org.slf4j.Logger;
@@ -48,33 +49,33 @@ public class Mural implements Closeable, Comparable<Mural> {
 	public static final int BUCKET_ITEM_SIZE = Util.SIZEOF_LONG;
 	public static final byte CLEAN = 0;
 	public static final byte DIRTY = 1;
+	private static final double loadFactor = 2;
 	private Index index;
-	private BufferedRandomAccessFile file;
+	private RandomAccessFile file;
+	private SmartReader reader;
 	private long timestamp;
 	private long indexOffset;
 	private byte dirtyByte;
 	private int numberOfItems;
 	
 	public Mural(String muralFilename) throws IOException {
-		this.file = new BufferedRandomAccessFile(muralFilename, "r");
+		this.file   = new RandomAccessFile(muralFilename, "r");
+		this.reader = new SmartReader(this.file.getChannel());
 		readHeader();
-		this.index = new SmallIndex(this.file.getChannel(), MapMode.READ_ONLY, indexOffset, this.file.length()-indexOffset);
+		this.index = new SmallIndex(this.file.getChannel(), MapMode.READ_ONLY, indexOffset, reader.length()-indexOffset);
 	}
 	
 	public Sketch get(byte[] key) throws IOException {
 		Sketch s;
 
 		long offset = getBucket(key);
-		if (offset == 0) {// empty bucket
-			//logger.debug("empty bucket");
+		if (offset == 0) // empty bucket
 			s = null;
-		} else if (offset < indexOffset) {// direct link to data
-			//logger.debug("got it directly");
+		else if (offset < indexOffset) // direct link to data
 			s = getSketch(offset);
-		} else { // search in bucket
-			//logger.debug("searching in the list");
+		else  // search in bucket
 			s = searchSketch(offset - indexOffset, key); 
-		}
+
 		return s;
 	}
 	
@@ -118,30 +119,37 @@ public class Mural implements Closeable, Comparable<Mural> {
 	}
 	
 	private Sketch getSketch(long offset) throws IOException {
-		file.seek(offset);
+		reader.seek(offset);
 		
-		return SketchHelper.readItem(file);
+		return SketchHelper.readItem(reader);
 	}
 	
 	private Sketch searchSketch(long offset, byte[] key) throws IOException {
-		index.position(offset);
+		long next = offset;
+		long data;
 		
-		long dataOffset;
-		while ((dataOffset = index.getOffset()) != 0) {
-			Sketch t = getSketch(dataOffset);
+		do {
 			
-			if (Arrays.equals(t.getKey(), key))
-				return t;
-		}
+			index.position(next);
+			
+			next = index.getOffset() - indexOffset;
+			data = index.getOffset();
+			
+			Sketch s = getSketch(data);
+			
+			if (Arrays.equals(s.getKey(), key))
+				return s;
+			
+		} while (next != 0);
 		
 		return null;
 	}
 	
 	private void readHeader() throws IOException {
-		dirtyByte     = file.readByte(); // should handle DIRTY file
-		timestamp     = file.readLong();
-		numberOfItems = file.readInt();
-		indexOffset   = file.readLong();		
+		dirtyByte     = reader.readByte(); // should handle DIRTY file
+		timestamp     = reader.readLong();
+		numberOfItems = (int) Math.floor(loadFactor * reader.readInt());
+		indexOffset   = reader.readLong();		
 	}
 	
 	public static void main(String[] args) throws IOException {
