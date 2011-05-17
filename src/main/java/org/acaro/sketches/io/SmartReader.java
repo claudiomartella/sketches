@@ -14,7 +14,7 @@ import com.google.common.base.Preconditions;
  * through buffering, from the seekability and from the fact it can return its 
  * current position within the file.
  * 
- * TODO: do check EOFException for read(byte[], int, int)
+ * TODO: check EOFException for read(byte[], int, int)
  * 
  * @author Claudio Martella
  *
@@ -120,17 +120,21 @@ public class SmartReader {
 		return this.size;
 	}
 	
-	public void seek(long destination) throws IOException {
+	public SmartReader seek(long destination) throws IOException {
 		Preconditions.checkArgument(destination < size, "cannot seek past EOF");
 		
 		if (destination >= left && destination < left + buffer.limit())
 			buffer.position((int) (destination - left)); // seek inside the buffer
 		else  
 			doSeek(destination);
+		
+		return this;
 	}
 	
-	public void close() throws IOException {
+	public SmartReader close() throws IOException {
 		channel.close();
+		
+		return this;
 	}
 	
 	private void checkAvailability(int size) throws IOException {

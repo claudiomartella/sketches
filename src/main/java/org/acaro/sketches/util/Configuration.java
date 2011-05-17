@@ -1,7 +1,6 @@
 package org.acaro.sketches.util;
 
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Map.Entry;
 import java.util.Properties;
@@ -59,7 +58,7 @@ public class Configuration {
 		}
 	}
 
-	public String getStringProperty(String key, String defaultValue) {
+	public String getString(String key, String defaultValue) {
 		String value = get(key);
 
 		if (value == null)
@@ -68,7 +67,7 @@ public class Configuration {
 			return value;
 	}
 
-	public int getIntProperty(String key, int defaultValue) {
+	public int getInt(String key, int defaultValue) {
 		String value = get(key);
 
 		if (value == null)
@@ -82,7 +81,7 @@ public class Configuration {
 		}
 	}
 
-	public double getDoubleProperty(String key, double defaultValue) {
+	public double getDouble(String key, double defaultValue) {
 		String value = get(key);
 
 		if (value == null)
@@ -95,8 +94,22 @@ public class Configuration {
 			return defaultValue;
 		}
 	}
+	
+	public float getFloat(String key, float defaultValue) {
+		String value = get(key);
 
-	public boolean getBooleanProperty(String key, boolean defaultValue) {
+		if (value == null)
+			return defaultValue;
+
+		try {
+			return Float.parseFloat(value);
+		} catch (NumberFormatException e) {
+			logger.info("NumberFormatException for property: " + key);
+			return defaultValue;
+		}
+	}
+
+	public boolean getBoolean(String key, boolean defaultValue) {
 		String value = get(key);
 
 		if ("true".equals(value))

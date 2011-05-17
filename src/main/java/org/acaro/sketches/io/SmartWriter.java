@@ -99,18 +99,24 @@ public class SmartWriter {
 		buffer.putDouble(v);
 	}
 
-	public void flush() throws IOException {
+	public SmartWriter flush() throws IOException {
 		flushBuffer();
+		
+		return this;
 	}
 
-	public void sync() throws IOException {
+	public SmartWriter sync() throws IOException {
 		flush();
 		channel.force(true);
+		
+		return this;
 	}
 
-	public void close() throws IOException {
+	public SmartWriter close() throws IOException {
 		sync();
 		channel.close();
+		
+		return this;
 	}
 
 	public long getFilePointer() throws IOException {

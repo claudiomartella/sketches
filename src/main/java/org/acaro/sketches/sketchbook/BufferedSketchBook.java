@@ -32,14 +32,13 @@ public class BufferedSketchBook implements SketchBook {
 
 	public BufferedSketchBook(String filename) throws IOException {
 		this.file = new FileOutputStream(filename, true);
-		this.bos = new BufferedOutputStream(file, bufferSize);
+		this.bos  = new BufferedOutputStream(file, bufferSize);
 		init();
 	}
 	
 	public synchronized void write(Sketch s) throws IOException {
-		for (ByteBuffer buffer: s.getBytes()) {
+		for (ByteBuffer buffer: s.getBytes())
 			bos.write(buffer.array());
-		}
 	}
 
 	public synchronized void close() throws IOException {

@@ -20,7 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.acaro.sketches.mindsketches.MindSketches;
-import org.acaro.sketches.mural.Mural;
+import org.acaro.sketches.mural.FSMural;
 import org.acaro.sketches.sketch.Buff;
 import org.acaro.sketches.sketch.Sketch;
 import org.acaro.sketches.sketch.Throwup;
@@ -44,7 +44,7 @@ import com.google.common.base.Preconditions;
 public class Sketches {
 	private MindSketches memory;
 	private SketchBook book;
-	private List<Mural> murals = new ArrayList<Mural>();
+	private List<FSMural> murals = new ArrayList<FSMural>();
 	private String path;
 	private String name;
 	
@@ -135,7 +135,7 @@ public class Sketches {
 	private Sketch muralsGet(byte[] key) throws IOException {
 		Sketch s = null;
 		
-		for (Mural w: murals) {
+		for (FSMural w: murals) {
 			if ((s = w.get(key)) != null) {
 				break;
 			}
@@ -150,7 +150,7 @@ public class Sketches {
 
 	private void initSketchBook(String path, String name) throws IOException {
 		String filename = SketchesHelper.getFilename(path, name);
-		this.memory = SketchesHelper.loadSketchBook(filename);
-		this.book   = new BufferedSketchBook(filename);
+		this.memory     = SketchesHelper.loadSketchBook(filename);
+		this.book       = new BufferedSketchBook(filename);
 	}
 }

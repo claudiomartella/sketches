@@ -18,6 +18,8 @@ package org.acaro.sketches.sketch;
 
 import java.nio.ByteBuffer;
 
+import com.google.common.primitives.UnsignedBytes;
+
 /**
  * 
  * @author Claudio Martella
