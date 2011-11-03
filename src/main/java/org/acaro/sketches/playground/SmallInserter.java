@@ -3,7 +3,6 @@ package org.acaro.sketches.playground;
 import java.io.IOException;
 
 import org.acaro.sketches.OldSketches;
-import org.acaro.sketches.util.Bytes;
 
 public class SmallInserter {
 

@@ -5,7 +5,7 @@ import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileChannel.MapMode;
 
-import org.acaro.sketches.util.Util;
+import org.acaro.sketches.utils.Sizes;
 
 import com.google.common.base.Preconditions;
 
@@ -15,13 +15,17 @@ import com.google.common.base.Preconditions;
  * 
  */
 
-public class BigIndex implements Index {
+public class BigIndex 
+implements Index {
+
 	private final long PAGE_SIZE = IndexFactory.PAGE_SIZE;
 	private MappedByteBuffer buffers[];
 	private long length;
 	private long position;
 	
-	public BigIndex(FileChannel channel, MapMode mode, long start, long length) throws IOException {
+	public BigIndex(FileChannel channel, MapMode mode, long start, long length) 
+	throws IOException {
+	
 		this.length   = length;
 		this.position = 0;
 		
@@ -48,6 +52,11 @@ public class BigIndex implements Index {
 		return this;
 	}
 
+	public void load() {
+		for (MappedByteBuffer b: buffers)
+			b.load();
+	}
+	
 	public boolean hasRemaining() {
 		return this.position < this.length;
 	}
@@ -57,7 +66,7 @@ public class BigIndex implements Index {
 	}
 	
 	public BigIndex position(long position) {
-		assert position % Util.SIZEOF_LONG == 0: "illegal position: " + position +". It should be dividable by the size of long.";
+		assert position % Sizes.SIZEOF_LONG == 0: "illegal position: " + position +". It should be dividable by the size of long.";
 		assert position < length && position >= 0: "position: " + position + " length: " + this.length;
 		
 		this.position = position;
@@ -73,7 +82,7 @@ public class BigIndex implements Index {
 	}
 	
 	public long getOffset(long position) {
-		assert position % Util.SIZEOF_LONG == 0: "illegal position: " + position +". It should be dividable by the size of long.";
+		assert position % Sizes.SIZEOF_LONG == 0: "illegal position: " + position +". It should be dividable by the size of long.";
 		assert position < length && position >= 0: "position: " + position + " length: " + this.length;
 		
         return buffers[getPage(position)].getLong(getIndex(position));
@@ -87,7 +96,7 @@ public class BigIndex implements Index {
 	}
 	
 	public Index putOffset(long position, long offset) {
-		assert position % Util.SIZEOF_LONG == 0: "illegal position: " + position +". It should be dividable by the size of long.";
+		assert position % Sizes.SIZEOF_LONG == 0: "illegal position: " + position +". It should be dividable by the size of long.";
 		assert position < length && position >= 0: "position: " + position + " length: " + this.length;
 		
         buffers[getPage(position)].putLong(getIndex(position), offset);
@@ -104,6 +113,6 @@ public class BigIndex implements Index {
 	}
 	
 	private void increasePosition() {
-		position += Util.SIZEOF_LONG;
+		position += Sizes.SIZEOF_LONG;
 	}
 }

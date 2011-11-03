@@ -18,39 +18,42 @@ package org.acaro.sketches.sfile;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.nio.ByteBuffer;
 
 import org.acaro.sketches.io.SmartWriter;
 import org.acaro.sketches.operation.Operation;
-import org.acaro.sketches.util.Configuration;
+import org.acaro.sketches.utils.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class FSSFileWriter implements Closeable {
+public class FSSFileWriter 
+implements Closeable {
+
 	private static final Logger logger = LoggerFactory.getLogger(FSSFileWriter.class);
 	private SmartWriter writer;
 	private long timestamp     = 0;
 	private long numberOfItems = 0;
 	private float loadFactor   = 0;
 	
-	public FSSFileWriter(String filename) throws IOException {
+	public FSSFileWriter(String filename) 
+	throws IOException {
+	
 		this.writer     = new SmartWriter(new RandomAccessFile(filename, "rw").getChannel());
 		this.loadFactor = Configuration.getConf().getFloat("sketches.sfile.loadfactor", 1.0f);
 		init();
 	}
 	
-	public void write(Operation o) throws IOException {
-		
-		for (ByteBuffer buffer: o.getBytes())
-			writer.write(buffer.array());
-
+	public void write(Operation o) 
+	throws IOException {
+	
+		o.writeTo(writer);
 		updateTimestamp(o);
 		numberOfItems++;
 	}
 
-	public void close() throws IOException {
-		logger.debug("Closing mural with ts: " + timestamp + " total: " + numberOfItems);
-
+	// XXX: we could die after writing CLEAN and before writing the rest
+	public void close() 
+	throws IOException {
+	
 		writer.flush();
 		writer.getChannel().position(0);
 		writer.writeByte(FSSFile.CLEAN);
@@ -60,7 +63,9 @@ public class FSSFileWriter implements Closeable {
 		writer.close();
 	}
 
-	private void init() throws IOException {
+	private void init() 
+	throws IOException {
+	
 		writer.writeByte(FSSFile.DIRTY);
 		writer.writeLong(0);
 		writer.writeLong(0);

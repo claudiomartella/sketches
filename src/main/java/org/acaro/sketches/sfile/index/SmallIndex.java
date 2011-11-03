@@ -5,7 +5,7 @@ import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileChannel.MapMode;
 
-import org.acaro.sketches.util.Util;
+import org.acaro.sketches.utils.Sizes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,6 +28,10 @@ public class SmallIndex implements Index {
 		return this;
 	}
 
+	public void load() {
+		buffer.load();
+	}
+	
 	public boolean hasRemaining() {
 		return buffer.hasRemaining();
 	}
@@ -37,7 +41,7 @@ public class SmallIndex implements Index {
 	}
 
 	public Index position(long position) {
-		assert position % Util.SIZEOF_LONG == 0: "illegal position: " + position +". It should be dividable by the size of long.";
+		assert position % Sizes.SIZEOF_LONG == 0: "illegal position: " + position +". It should be dividable by the size of long.";
 		assert position < length && position >= 0: "position: " + position + " length: " + this.length;
 		
 		buffer.position((int) position);
@@ -50,7 +54,7 @@ public class SmallIndex implements Index {
 	}
 
 	public long getOffset(long position) {
-		assert position % Util.SIZEOF_LONG == 0: "illegal position: " + position +". It should be dividable by the size of long.";
+		assert position % Sizes.SIZEOF_LONG == 0: "illegal position: " + position +". It should be dividable by the size of long.";
 		assert position < length && position >= 0: "position: " + position + " length: " + this.length;
 		
 		return buffer.getLong((int) position);
@@ -63,7 +67,7 @@ public class SmallIndex implements Index {
 	}
 	
 	public Index putOffset(long position, long offset) {
-		assert position % Util.SIZEOF_LONG == 0: "illegal position: " + position +". It should be dividable by the size of long.";
+		assert position % Sizes.SIZEOF_LONG == 0: "illegal position: " + position +". It should be dividable by the size of long.";
 		assert position < length && position >= 0: "position: " + position + " length: " + this.length;
 		
 		buffer.putLong((int) position, offset);

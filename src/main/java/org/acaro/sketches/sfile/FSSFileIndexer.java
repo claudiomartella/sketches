@@ -3,18 +3,18 @@ package org.acaro.sketches.sfile;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel.MapMode;
-import java.util.concurrent.Callable;
 
 import org.acaro.sketches.io.SmartWriter;
 import org.acaro.sketches.sfile.index.Index;
 import org.acaro.sketches.sfile.index.IndexFactory;
-import org.acaro.sketches.util.BloomFilter;
-import org.acaro.sketches.util.MurmurHash3;
-import org.acaro.sketches.util.Util;
+import org.acaro.sketches.utils.BloomFilter;
+import org.acaro.sketches.utils.MurmurHash3;
+import org.acaro.sketches.utils.Sizes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class FSSFileIndexer implements Callable<String> {
+public class FSSFileIndexer {
+
 	private static final Logger logger = LoggerFactory.getLogger(FSSFileIndexer.class);
 	private FSSFileIterator muralIterator;
 	private RandomAccessFile file;
@@ -27,11 +27,13 @@ public class FSSFileIndexer implements Callable<String> {
 	private long directorySize;
 	private float loadFactor;
 
-	public FSSFileIndexer(String muralFilename) throws IOException {
-		this.muralIterator = new FSSFileIterator(muralFilename);
+	public FSSFileIndexer(String fssfileFilename) 
+	throws IOException {
+	
+		this.muralIterator = new FSSFileIterator(fssfileFilename);
 		this.numberOfItems = muralIterator.getNumberOfItems();
 		this.loadFactor    = muralIterator.getLoadFactor();
-		this.file          = new RandomAccessFile(muralFilename, "rw");
+		this.file          = new RandomAccessFile(fssfileFilename, "rw");
 		this.writer        = new SmartWriter(file.getChannel());
 		this.bloom         = BloomFilter.getFilter(numberOfItems, 0.01);
 		this.indexOffset   = file.length();
@@ -39,7 +41,8 @@ public class FSSFileIndexer implements Callable<String> {
 		init();
 	}
 
-	public String call() throws IOException {
+	public void index() 
+	throws IOException {
 		
 		while (muralIterator.hasNext()) {
 			byte[] key  = muralIterator.next().getKey();
@@ -53,17 +56,17 @@ public class FSSFileIndexer implements Callable<String> {
 		BloomFilter.serialize(bloom, writer);
 		
 		close();
-
-		return null;
 	}
-
-	public void close() throws IOException {
+	
+	public void close() 
+	throws IOException {
+	
 		buckets.force();
 		muralIterator.close();
 		writer.flush();
 		file.seek(0);
 		file.writeByte(FSSFile.CLEAN);
-		file.skipBytes(Util.SIZEOF_LONG+Util.SIZEOF_LONG+Util.SIZEOF_FLOAT+Util.SIZEOF_LONG);
+		file.skipBytes(Sizes.SIZEOF_LONG+Sizes.SIZEOF_LONG+Sizes.SIZEOF_FLOAT+Sizes.SIZEOF_LONG);
 		file.writeLong(bloomOffset);
 		file.getFD().sync();
 		file.close();
@@ -84,7 +87,9 @@ public class FSSFileIndexer implements Callable<String> {
 	 * (b) offset < indexOffset -> points directly to Sketch
 	 * (c) offset >= indexOffset -> points to the head of the list 
 	 */
-	private void writeToBucket(byte[] key, long offset) throws IOException {
+	private void writeToBucket(byte[] key, long offset) 
+	throws IOException {
+	
 		long index = calculateBucketIndex(calculateBucket(key));
 		long last  = buckets.getOffset(index);
 		long position = 0;
@@ -100,7 +105,9 @@ public class FSSFileIndexer implements Callable<String> {
 		buckets.putOffset(index, position);
 	}
 
-	private long writeItem(long prev, long offset) throws IOException {
+	private long writeItem(long prev, long offset) 
+	throws IOException {
+	
 		long position = writer.getFilePointer();
 
 		writer.writeLong(prev);
@@ -109,26 +116,34 @@ public class FSSFileIndexer implements Callable<String> {
 		return position;
 	}
 
-	private void init() throws IOException {
+	private void init() 
+	throws IOException {
+	
 		writeHeader();
 		createBuckets();
 	}
 
-	private void writeHeader() throws IOException {
+	private void writeHeader() 
+	throws IOException {
+	
 		file.seek(0);
 		file.writeByte(FSSFile.DIRTY);
-		file.skipBytes(Util.SIZEOF_LONG+Util.SIZEOF_FLOAT+Util.SIZEOF_LONG);
+		file.skipBytes(Sizes.SIZEOF_LONG+Sizes.SIZEOF_FLOAT+Sizes.SIZEOF_LONG);
 		file.writeLong(indexOffset);
 		file.getFD().sync();
 	}
 	
-	private void createBuckets() throws IOException {
+	private void createBuckets() 
+	throws IOException {
+	
 		file.seek(indexOffset);
 		createIndex(directorySize << 3);
 		buckets = IndexFactory.createIndex(file.getChannel(), MapMode.READ_WRITE, indexOffset, directorySize << 3);
 	}
 
-	private void createIndex(long indexSize) throws IOException {
+	private void createIndex(long indexSize) 
+	throws IOException {
+	
 		int CHUNK_SIZE = 65535;
 		if (indexSize <= CHUNK_SIZE) {
 			byte[] b = new byte[(int) indexSize];
@@ -149,13 +164,14 @@ public class FSSFileIndexer implements Callable<String> {
 		writer.flush();
 	}
 
-	public static void main(String[] args) throws IOException {
+	public static void main(String[] args) 
+	throws IOException {
 		if (args.length != 1) {
 			System.out.println("usage: MuralIndexer <filename>");
 			System.exit(-1);
 		}
 
 		FSSFileIndexer indexer = new FSSFileIndexer(args[0]);
-		indexer.call();
+		indexer.index();
 	}
 }

@@ -20,61 +20,104 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.acaro.sketches.io.OperationReader;
-import org.acaro.sketches.io.OperationWriter;
-import org.acaro.sketches.logfile.BufferedLogfile;
+import org.acaro.sketches.io.OperationMutator;
+import org.acaro.sketches.logfiles.BufferedLogfile;
 import org.acaro.sketches.operation.Delete;
 import org.acaro.sketches.operation.Operation;
-import org.acaro.sketches.util.Configuration;
+import org.acaro.sketches.sfile.SFile;
+import org.acaro.sketches.utils.Configuration;
+import org.acaro.sketches.utils.FilenamesFactory;
 
 import org.cliffc.high_scale_lib.NonBlockingHashMap;
 
 /**
- * This class represents the Memstore, where the written data is kept before
- * being flushed to disk. It builds around a NonBlockingHashMap for the data and
- * an AtomicLong that counts the total amout of data passed through the store.
+ * The Memstore is where the written data is kept before it is flushed to disk. 
+ * It builds around a NonBlockingHashMap for the data, an AtomicLong that 
+ * counts the total amout of data passed through the store and an AtomicLong for
+ * the timestamp of oldest entry.
  * 
  * @author Claudio Martella
  *
  */
-public class Memstore implements OperationReader, OperationWriter {
-	private final int initialCapacity = Configuration.getConf().getInt("sketches.mindsketches.initialcapacity", 100000);
-	private final NonBlockingHashMap<byte[],Operation> map = new NonBlockingHashMap<byte[], Operation>(initialCapacity);
+public class Memstore 
+implements OperationReader, OperationMutator {
+
+	private final int initialCapacity = Configuration.getConf().getInt("sketches.memstore.initialcapacity", 100000);
+	private final NonBlockingHashMap<byte[], Operation> map = new NonBlockingHashMap<byte[], Operation>(initialCapacity);
 	private final AtomicLong size      = new AtomicLong(0);
 	private final AtomicLong timestamp = new AtomicLong(0);
 	private BufferedLogfile log;
 	
-	public Memstore() { }
-	
-	public Memstore(String logFilename) {
+	public Memstore() 
+	throws IOException { 
 		
+		this.log = new BufferedLogfile(FilenamesFactory.getLogFilename());
+	}
+	
+	public Memstore(String logFilename) 
+	throws IOException { 
+	
+		this.log = new BufferedLogfile(logFilename, false, true);
 	}
 	
 	public Operation get(byte[] key) {
 		return map.get(key);
 	}
 
-	public void put(byte[] key, Operation o) throws IOException {
+	public void put(byte[] key, Operation o) 
+	throws IOException {
+	
 		updateSize(o.getSize());
 		updateTimestamp(o.getTimestamp());
 
-		map.put(key, o);
 		log.write(o);
+		map.put(key, o);
 	}
 	
-	public void delete(byte[] key) throws IOException {
+	public void delete(byte[] key) 
+	throws IOException {
+	
 		put(key, new Delete(key));
 	}
 	
-	public void flush() throws IOException {
+	public void flush() 
+	throws IOException {
+	
 		log.flush();
 	}
 
 	public long getSize() {
 		return this.size.get();
 	}
+	
+	public String getName() {
+		return log.getName();
+	}
 
 	public long getTimestamp() {
 		return this.timestamp.get();
+	}
+	
+	public boolean isCompactable() {
+		return false;
+	}
+	
+	public void close() 
+	throws IOException {
+
+		// log should flush & sync
+		log.close();
+	}
+
+	public int compareTo(OperationReader other) {
+		long otherTS = other.getTimestamp();
+		
+		if (this.getTimestamp() < otherTS)
+			return -1;
+		else if (this.getTimestamp() > otherTS)
+			return 1;
+		else
+			return 0;
 	}
 
 	public Map<byte[], Operation> getMap() {
@@ -90,7 +133,7 @@ public class Memstore implements OperationReader, OperationWriter {
 		while (true) {
 			long oldTs = timestamp.get();
 
-			if (ts < oldTs || timestamp.compareAndSet(oldTs, ts))
+			if (ts <= oldTs || timestamp.compareAndSet(oldTs, ts))
 				break;
 		}
 	}

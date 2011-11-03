@@ -2,7 +2,6 @@ package org.acaro.sketches.operation;
 
 import java.util.Comparator;
 
-
 import com.google.common.primitives.UnsignedBytes;
 
 public class OperationComparator implements Comparator<Operation> {

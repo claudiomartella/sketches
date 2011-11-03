@@ -3,12 +3,12 @@ package org.acaro.sketches.playground;
 import java.io.IOException;
 
 import org.acaro.sketches.OldSketches;
-import org.acaro.sketches.util.Bytes;
+import org.acaro.sketches.Sketches;
 
 public class BigInserter {
 
 	public static void main(String[] args) throws IOException {
-		OldSketches sketches = new OldSketches("./resources/", "bigfile");
+		Sketches sketches = new Sketches("./resources/");
 		byte[] value = new byte[1];
 		
 		long start = System.currentTimeMillis();

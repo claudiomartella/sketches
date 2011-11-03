@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.util.Random;
 
 import org.acaro.sketches.OldSketches;
-import org.acaro.sketches.util.Bytes;
 
 public class T5MInserter {
 

@@ -15,6 +15,7 @@
 
 package org.acaro.sketches.operation;
 
+import java.io.DataInput;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -26,170 +27,27 @@ import org.acaro.sketches.io.SmartReader;
 
 
 public class OperationHelper {
-
-	public static Operation readItem(MappedByteBuffer buffer) throws IOException {
-		Operation o;
-		
-		byte type = buffer.get();
-		long ts = buffer.getLong();
-		short keySize = buffer.getShort();
-		int valueSize = buffer.getInt();
-		
-		byte[] key, value;
-		
-		switch (type) {
-		
-		case Operation.UPDATE: 
-
-			key = new byte[keySize];
-			value = new byte[valueSize];
-			buffer.get(key); 
-			buffer.get(value);
-			o = new Update(key, value, ts);
-			break;
-
-		case Operation.DELETE:
-
-			key = new byte[keySize];
-			buffer.get(key);
-			o = new Delete(key, ts); 
-			break;
-
-		default: throw new IOException("Corrupted Logfile: read unknown type: " + type); 
-		}
-		
-		return o;
-	}
 	
-	public static Operation readItem(DataInputStream input) throws IOException {
+	public static Operation readOperation(DataInput in) 
+	throws IOException {
+	
 		Operation o;
 		
-		byte type = input.readByte();
-		long ts = input.readLong();
-		short keySize = input.readShort();
-		int valueSize = input.readInt();
-		
-		byte[] key, value;
-		
+		byte type = in.readByte();
 		switch (type) {
-		case Operation.UPDATE: 
+		
+		case Operation.UPDATE:
+
+			o = Update.read(in);
+			break;
 			
-			key = new byte[keySize];
-			value = new byte[valueSize];
-			input.readFully(key);
-			input.readFully(value);
-			o = new Update(key, value, ts);
-			break;
-
 		case Operation.DELETE:
-
-			key = new byte[keySize];
-			input.readFully(key);
-			o = new Delete(key, ts); 
-			break;
-
-		default: throw new IOException("Corrupted Logfile: read unknown type: " + type); 
-		}
-		
-		return o;
-	}
-	
-	public static Operation readItem(RandomAccessFile input) throws IOException {
-		Operation o;
-		
-		byte type = input.readByte();
-		long ts = input.readLong();
-		short keySize = input.readShort();
-		int valueSize = input.readInt();
-		
-		byte[] key, value;
-		
-		switch (type) {
-		case Operation.UPDATE: 
 			
-			key = new byte[keySize];
-			value = new byte[valueSize];
-			input.readFully(key);
-			input.readFully(value);
-			o = new Update(key, value, ts);
+			o = Delete.read(in);
 			break;
-
-		case Operation.DELETE:
-
-			key = new byte[keySize];
-			input.readFully(key);
-			o = new Delete(key, ts); 
-			break;
-
-		default: throw new IOException("Corrupted Logfile: read unknown type: " + type); 
-		}
-		
-		return o;
-	}
-	
-	public static Operation readItem(FileChannel channel) throws IOException {
-		Operation o;
-		ByteBuffer buffer = ByteBuffer.allocate(Operation.HEADER_SIZE);
-		
-		byte type = buffer.get();
-		long ts = buffer.getLong();
-		short keySize = buffer.getShort();
-		int valueSize = buffer.getInt();
-		
-		ByteBuffer key, value;
-		
-		switch (type) {
-		
-		case Operation.UPDATE: 
-
-			key = ByteBuffer.allocate(keySize);
-			value = ByteBuffer.allocate(valueSize);
-			ByteBuffer[] payload = { key , value };
-			while (channel.read(payload) > 0);
-			o = new Update(key.array(), value.array(), ts);
-			break;
-
-		case Operation.DELETE:
-
-			key = ByteBuffer.allocate(keySize);
-			while (channel.read(key) > 0);
-			o = new Delete(key.array(), ts); 
-			break;
-
-		default: throw new IOException("Corrupted Logfile: read unknown type: " + type); 
-		}
-	
-		return o;
-	}
-	
-	public static Operation readItem(SmartReader input) throws IOException {
-		Operation o;
-		
-		byte type = input.readByte();
-		long ts = input.readLong();
-		short keySize = input.readShort();
-		int valueSize = input.readInt();
-		
-		byte[] key, value;
-		
-		switch (type) {
-		case Operation.UPDATE: 
 			
-			key = new byte[keySize];
-			value = new byte[valueSize];
-			input.read(key);
-			input.read(value);
-			o = new Update(key, value, ts);
-			break;
-
-		case Operation.DELETE:
-
-			key = new byte[keySize];
-			input.read(key);
-			o = new Delete(key, ts); 
-			break;
-
-		default: throw new IOException("Corrupted Logfile: read unknown type: " + type); 
+		default:
+			throw new IllegalArgumentException("unknown type " + type);
 		}
 		
 		return o;

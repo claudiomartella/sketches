@@ -26,29 +26,30 @@ import org.acaro.sketches.operation.Operation;
 import org.acaro.sketches.operation.OperationHelper;
 import org.acaro.sketches.operation.Update;
 import org.acaro.sketches.playground.T5Miterator;
+import org.acaro.sketches.io.OperationReader;
 import org.acaro.sketches.io.SmartReader;
 import org.acaro.sketches.sfile.index.Index;
 import org.acaro.sketches.sfile.index.IndexFactory;
-import org.acaro.sketches.util.BloomFilter;
-import org.acaro.sketches.util.MurmurHash3;
-import org.acaro.sketches.util.Util;
+import org.acaro.sketches.utils.BloomFilter;
+import org.acaro.sketches.utils.Configuration;
+import org.acaro.sketches.utils.MurmurHash3;
+import org.acaro.sketches.utils.Sizes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * It's an immutable sorted list. This is where immutable Sketches go. 
+ * It's an immutable sorted list. This is where immutable Operations go. 
  * Data in these files can't be overwritten. Think of it as SequenceFile. 
- * 
- * "A large and labor-intensive graffiti painting."
  * 
  * @author Claudio Martella
  * 
  */
 
-public class FSSFile implements SFile, Closeable, Comparable<SFile> {
-	private static final Logger logger = LoggerFactory.getLogger(FSSFile.class);
+public class FSSFile 
+implements SFile, Closeable {
+
 	//									  dirty byte      - timestamp      - #items         - load factor     - index offset   - bloomfilter off
-	public static final int HEADER_SIZE = Util.SIZEOF_BYTE+Util.SIZEOF_LONG+Util.SIZEOF_LONG+Util.SIZEOF_FLOAT+Util.SIZEOF_LONG+Util.SIZEOF_LONG;
+	public static final int HEADER_SIZE = Sizes.SIZEOF_BYTE+Sizes.SIZEOF_LONG+Sizes.SIZEOF_LONG+Sizes.SIZEOF_FLOAT+Sizes.SIZEOF_LONG+Sizes.SIZEOF_LONG;
 	public static final byte CLEAN = 0;
 	public static final byte DIRTY = 1;
 	private Index index;
@@ -62,15 +63,26 @@ public class FSSFile implements SFile, Closeable, Comparable<SFile> {
 	private long directorySize;
 	private float loadFactor;
 
-	public FSSFile(String filename) throws IOException {
-		this.reader = new SmartReader(new RandomAccessFile(filename, "r").getChannel());
+	public FSSFile(String filename, int blockSize) 
+	throws IOException {
+	
+		this.reader = new SmartReader(new RandomAccessFile(filename, "r").getChannel(), blockSize);
 		readHeader();
 		this.directorySize = (long) Math.floor((double) loadFactor * numberOfItems);
 		this.index = IndexFactory.createIndex(reader.getChannel(), MapMode.READ_ONLY, indexOffset, bloomOffset-indexOffset);
 		this.bloom = BloomFilter.deserialize(reader.seek(bloomOffset));
+		this.index.load();
 	}
 	
-	public Operation get(byte[] key) throws IOException {
+	public FSSFile(String filename) 
+	throws IOException {
+	
+		this(filename, Configuration.getConf().getInt("sketches.sfile.blocksize", 4096));
+	}
+	
+	public Operation get(byte[] key) 
+	throws IOException {
+		
 		Operation o;
 		
 		if (!bloom.isPresent(key))
@@ -80,14 +92,16 @@ public class FSSFile implements SFile, Closeable, Comparable<SFile> {
 		if (offset == 0)
 			o = null;
 		else if (offset < indexOffset) // direct link to data
-			o = getOperation(offset);
+			o = getItem(offset);
 		else // search in the bucket
-			o = searchOperation(offset - indexOffset, key);
+			o = searchItem(offset - indexOffset, key);
 		
 		return o;
 	}
 	
-	public void close() throws IOException {
+	public void close() 
+	throws IOException {
+	
 		reader.close();
 	}
 	
@@ -115,7 +129,12 @@ public class FSSFile implements SFile, Closeable, Comparable<SFile> {
 		return this.bloomOffset;
 	}
 	
-	public int compareTo(SFile other) {
+	public String getName() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+	
+	public int compareTo(OperationReader other) {
 		long otherTs = other.getTimestamp();
 		
 		if (this.timestamp > otherTs)
@@ -126,7 +145,7 @@ public class FSSFile implements SFile, Closeable, Comparable<SFile> {
 			return 0;
 	}
 	
-	public boolean scribable() {
+	public boolean isCompactable() {
 		return true;
 	}
 	
@@ -142,23 +161,28 @@ public class FSSFile implements SFile, Closeable, Comparable<SFile> {
 		return (MurmurHash3.hash(key) & 0x7fffffffffffffffL) % directorySize;
 	}
 	
-	private Operation getOperation(long offset) throws IOException {
+	private Operation getItem(long offset) 
+	throws IOException {
+	
 		reader.seek(offset);
 		
-		return OperationHelper.readItem(reader);
+		return OperationHelper.readOperation(reader);
 	}
 	
-	private Operation searchOperation(long offset, byte[] key) throws IOException {
+	private Operation searchItem(long offset, byte[] key) 
+	throws IOException {
+	
 		long next = offset;
 		long data;
 		
 		do {
+			
 			index.position(next);
 			
 			next = index.getOffset();
 			data = index.getOffset();
 			
-			Operation o = getOperation(data);
+			Operation o = getItem(data);
 			
 			if (Arrays.equals(o.getKey(), key))
 				return o;
@@ -168,7 +192,9 @@ public class FSSFile implements SFile, Closeable, Comparable<SFile> {
 		return null;
 	}
 	
-	private void readHeader() throws IOException {
+	private void readHeader() 
+	throws IOException {
+	
 		dirtyByte     = reader.readByte(); // should handle DIRTY file
 		timestamp     = reader.readLong();
 		numberOfItems = reader.readLong();
@@ -177,9 +203,11 @@ public class FSSFile implements SFile, Closeable, Comparable<SFile> {
 		bloomOffset   = reader.readLong();
 	}
 	
-	public static void main(String[] args) throws IOException {
+	public static void main(String[] args) 
+	throws IOException {
+	
 		if (args.length != 2) {
-			System.out.println("usage: Mural <mural filename> <key>");
+			System.out.println("usage: FSSFile <fssfile filename> <key>");
 			System.exit(0);
 		}
 		

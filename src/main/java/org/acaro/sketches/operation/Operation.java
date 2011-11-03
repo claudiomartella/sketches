@@ -15,23 +15,22 @@
 
 package org.acaro.sketches.operation;
 
-import java.nio.ByteBuffer;
-
-import org.acaro.sketches.util.Util;
+import org.acaro.sketches.io.Writable;
+import org.acaro.sketches.utils.Sizes;
 
 /**
  * 
  * @author Claudio Martella
  * 
- * this is the interface for operations on the DB. You can think of it as Operation. 
- * "a rapidly executed freehand drawing that is not intended as a finished work"
+ * Interface for operations on the DB. 
  *
  */
 
-public interface Operation {
-	static final byte UPDATE = 1;
-	static final byte DELETE = 2;
-	static final int HEADER_SIZE = Util.SIZEOF_BYTE+Util.SIZEOF_LONG+Util.SIZEOF_SHORT+Util.SIZEOF_INT;
+public interface Operation 
+extends Writable {
+	
+	public static final byte UPDATE = 1;
+	public static final byte DELETE = 2;
 	
 	public byte[] getKey();
 	
@@ -39,7 +38,5 @@ public interface Operation {
 	
 	public long getTimestamp();
 	
-	public abstract ByteBuffer[] getBytes();
-	
-	public abstract int getSize();	
+	public int getSize();	
 }

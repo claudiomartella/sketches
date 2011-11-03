@@ -11,19 +11,21 @@
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
-*/
+ */
 
 package org.acaro.sketches.operation;
 
-import java.nio.ByteBuffer;
+import java.io.DataInput;
+import java.io.DataOutput;
+import java.io.IOException;
+
+import org.acaro.sketches.utils.Sizes;
 
 /**
  * 
  * @author Claudio Martella
  * 
- * this is a Delete. Some NoSQLs call it Tombstone. "To remove painted 
- * graffiti with chemicals and other instruments, or to paint over it with 
- * a flat color."
+ * This is a Delete. Some NoSQLs call it Tombstone.
  * 
  * +----+---------+--------+---+
  * |  1 |    8    |    2   | N |
@@ -31,54 +33,75 @@ import java.nio.ByteBuffer;
  * +----+---------+--------+---+
  */
 
-public class Delete implements Operation {
-	private final byte[] key;
-	private final long ts;
-	private byte[] header;
-	
+public class Delete 
+implements Operation {
+
+	private byte[] key;
+	private long ts;
+
+	private Delete() { }
+
 	public Delete(byte[] key){
 		this.key = key;
 		this.ts  = System.currentTimeMillis();
-		initHeader();
 	}
-	
+
 	public Delete(byte[] key, long ts) {
 		this.key = key;
 		this.ts	 = ts;
-		initHeader();	
 	}
 
-	public ByteBuffer[] getBytes() {
-		ByteBuffer[] tokens = { ByteBuffer.wrap(header), ByteBuffer.wrap(key) };
-		
-		return tokens;
-	}
-	
+	@Override
 	public byte[] getKey() {
 		return this.key;
 	}
-	
+
+	@Override
 	public byte[] getValue() {
 		return null;
 	}
-	
+
+	@Override
 	public int getSize() {
-		return header.length + key.length;
+		return Sizes.SIZEOF_LONG + key.length;
 	}
 
+	@Override
 	public long getTimestamp() {
 		return this.ts;
 	}
-	
+
 	public String toString() {
 		return "Buff key: " + this.key + " ts: " + this.ts;
 	}
-	
-	private void initHeader() {
-		this.header = ByteBuffer.allocate(HEADER_SIZE).put(DELETE)
-		.putLong(ts)
-		.putShort((short) key.length)
-		.putInt(0)
-		.array();
+
+	@Override
+	public void readFrom(DataInput in) 
+	throws IOException {
+
+		this.ts  = in.readLong();
+		short kl = in.readShort();
+		byte[] buffer = new byte[kl];
+		in.readFully(buffer);
+		this.key = buffer;
+	}
+
+	@Override
+	public void writeTo(DataOutput out) 
+	throws IOException {
+
+		out.writeByte(DELETE);
+		out.writeLong(ts);
+		out.writeShort((short) key.length);
+		out.write(key);
+	}
+
+	public static Delete read(DataInput in) 
+	throws IOException {
+
+		Delete d = new Delete();
+		d.readFrom(in);
+
+		return d;
 	}
 }

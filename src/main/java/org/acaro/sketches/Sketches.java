@@ -15,28 +15,41 @@
 
 package org.acaro.sketches;
 
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Preconditions.checkState;
+
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import org.acaro.sketches.io.OperationMutator;
 import org.acaro.sketches.io.OperationReader;
-import org.acaro.sketches.io.OperationWriter;
+import org.acaro.sketches.io.Writable;
+import org.acaro.sketches.logfiles.Logfile;
+import org.acaro.sketches.logfiles.state.NewCompactedSFile;
+import org.acaro.sketches.logfiles.state.NewLogfile;
+import org.acaro.sketches.logfiles.state.NewScribedSFile;
+import org.acaro.sketches.logfiles.state.StateLog;
+import org.acaro.sketches.logfiles.state.StateLog.StateLogReader;
 import org.acaro.sketches.memstore.Memstore;
 import org.acaro.sketches.operation.Operation;
 import org.acaro.sketches.operation.Update;
+import org.acaro.sketches.sfile.FSSFile;
 import org.acaro.sketches.sfile.RAMSFile;
 import org.acaro.sketches.sfile.SFile;
-import org.acaro.sketches.util.Configuration;
+import org.acaro.sketches.utils.Configuration;
+import org.acaro.sketches.utils.FilenamesFactory;
+import org.acaro.sketches.utils.OperationReaders;
+import org.acaro.sketches.utils.SketchesHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.google.common.base.Preconditions;
 
 /**
  * 
@@ -50,62 +63,42 @@ import com.google.common.base.Preconditions;
  */
 
 public class Sketches {
-	private static final Logger logger = LoggerFactory.getLogger(OldSketches.class);
-
-	private OperationWriter writer;
-	private final List<OperationReader> readers = new ArrayList<OperationReader>();
-	/* 
-	 * This lock protects modification of readers and writer, not the modification of a contained Sketch.
-	 * - lock for read when you access readers or writer
-	 * - lock for write when you modify readers (at bombing & scribing) and writer reference 
-	 */
-	private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
-	private final Lock readLock  = lock.readLock();
-	private final Lock writeLock = lock.writeLock();
-
-	private final Configuration conf = Configuration.getConf();
-
-	// this will flush the log every 10 seconds by default. It stops at first Exception
-	private final ScheduledExecutorService flushScheduler = Executors.newScheduledThreadPool(1);
-	private final ScheduledFuture<?> flusherHandle = flushScheduler.scheduleAtFixedRate(
-																	new Flusher(), 
-																	conf.getInt("sketches.flusherdelay", 10000), 
-																	conf.getInt("sketches.flusherdelay", 10000), 
-																	TimeUnit.MILLISECONDS);
-
-	// this will try to scribe the Memestore if it's bigger than default 64MB. It stops at first Exception
-	private final ScheduledExecutorService scriberScheduler = Executors.newScheduledThreadPool(1);
-	private final ScheduledFuture<?> scriberHandle = scriberScheduler.scheduleAtFixedRate(
-																	  new Scriber(conf.getInt("sketches.memstore.maxsize", 64)), 
-																	  conf.getInt("sketches.scriberdelay", 30), 
-																	  conf.getInt("sketches.scriberdelay", 30), 
-																	  TimeUnit.SECONDS);
-
-	private final ScheduledExecutorService compactorScheduler = Executors.newScheduledThreadPool(1);
-	private ScheduledFuture<?> compactorHandle;
 	
-	private String path;
-	private String name;
+	private static final Logger logger = LoggerFactory.getLogger(Sketches.class);
+	private final SketchesState state  = new SketchesState();
+	private final Configuration conf   = Configuration.getConf();
 
-	public Sketches(String path, String name) throws IOException {
-		Preconditions.checkNotNull(path);
-		Preconditions.checkNotNull(name);
+	private final ScheduledExecutorService scheduledExecutor = Executors.newScheduledThreadPool(2);
+	private final ExecutorService executor = Executors.newCachedThreadPool();
+	
+	// directory where we store our files.
+	private final String path;
+
+	public Sketches(String path) 
+	throws IOException {
+		
+		checkNotNull(path);
 		this.path = path;
-		this.name = name;
-		init(path, name);
+		init(path);
 	}
+	
+	public void put(byte[] key, byte[] value) 
+	throws IOException {
 
-	public void put(byte[] key, byte[] value) throws IOException {
-		Preconditions.checkNotNull(key);
-		Preconditions.checkNotNull(value);
-		Preconditions.checkArgument(key.length <= Short.MAX_VALUE, "key length can not be bigger than %s", Short.MAX_VALUE);
+		checkState(!state.isShutdown());
+		checkNotNull(key);
+		checkNotNull(value);
+		checkArgument(key.length <= Short.MAX_VALUE);
 
 		doPut(key, new Update(key, value));
 	}
 
-	public byte[] get(byte[] key) throws IOException {
-		Preconditions.checkNotNull(key);
-		Preconditions.checkArgument(key.length <= Short.MAX_VALUE, "key length can not be bigger than %s", Short.MAX_VALUE);
+	public byte[] get(byte[] key) 
+	throws IOException {
+
+		checkState(!state.isShutdown());
+		checkNotNull(key);
+		checkArgument(key.length <= Short.MAX_VALUE);
 
 		Operation o;
 		byte[] value = null;
@@ -116,151 +109,436 @@ public class Sketches {
 		return value;
 	}
 
-	public void delete(byte[] key) throws IOException {
-		Preconditions.checkNotNull(key);
-		Preconditions.checkArgument(key.length <= Short.MAX_VALUE, "key length can not be bigger than %s", Short.MAX_VALUE);
+	public void delete(byte[] key) 
+	throws IOException {
+
+		checkState(!state.isShutdown());
+		checkNotNull(key);
+		checkArgument(key.length <= Short.MAX_VALUE);
 
 		doDelete(key);
 	}
 
-	public void shutdown() throws IOException {
-		flusherHandle.cancel(false); // will these block or fail?
-		scriberHandle.cancel(false); 
+	public void shutdown() 
+	throws IOException {
+
+		/*
+		 * Stop the API. Acquiring writeLock should guarantee that all user
+		 * paths to API that were already down the road should have returned.
+		 */
+		checkState(!state.setShutdown());
+		state.writeLock.lock();
+		state.writeLock.unlock();
 		
-		// stop everthing and close things
+		// Stop the machinery. This could let us wait for a while...
+		scheduledExecutor.shutdown();
+		executor.shutdown();
+				
+		// freeze state
+		state.shutdown();
 	}
 
-	private Operation doGet(byte[] key) throws IOException {
-		Operation o = null;
-
-		readLock.lock();
-
+	private Operation doGet(byte[] key) 
+	throws IOException {
+		
+		state.readLock.lock();
 		try {
-
-			for (OperationReader reader: readers)
+			
+			Operation o = null;
+			for (OperationReader reader: state.getReaders())
 				if ((o = reader.get(key)) != null)
 					break;
 
+			return o;
+			
 		} finally {
-			readLock.unlock();
+			state.readLock.unlock();
 		}
-
-		return o;
 	}
 
-	private void doPut(byte[] key, Operation o) throws IOException {
+	private void doPut(byte[] key, Operation o) 
+	throws IOException {
 
-		readLock.lock();
-
+		state.readLock.lock();
 		try {
 
-			writer.put(key, o);
+			state.getMutator().put(key, o);
 
 		} finally {
-			readLock.unlock();
+			state.readLock.unlock();
 		}
 	}
 	
-	private void doDelete(byte[] key) throws IOException {
+	private void doDelete(byte[] key) 
+	throws IOException {
 
-		readLock.lock();
-
+		state.readLock.lock();
 		try {
 
-			writer.delete(key);
+			state.getMutator().delete(key);
 
 		} finally {
-			readLock.unlock();
+			state.readLock.unlock();
 		}
 	}
 	
-	private void init(String path, String name) {
-		// initialize Memstore, possibly from a Logfile
-		// load possible SFiles
+	private void init(String path) 
+	throws IOException {
+		
+		scheduledExecutor.scheduleAtFixedRate(new Flusher(), 
+											  conf.getInt("sketches.flusherdelay", 10000), 
+											  conf.getInt("sketches.flusherdelay", 10000), 
+											  TimeUnit.MILLISECONDS);
+		scheduledExecutor.scheduleAtFixedRate(new ScriberScheduler(), 
+				  							  conf.getInt("sketches.scriberdelay", 30), 
+				  							  conf.getInt("sketches.scriberdelay", 30), 
+				  							  TimeUnit.SECONDS);
+		
+		state.init();
 	}
-
-	/*
-	 * ScheduledTask Robots start here.
+	
+	private void scheduleCompaction() {
+		int maxFiles = conf.getInt("sketches.sfile.maxfiles", 4);
+		
+		state.readLock.lock();
+		try {
+			
+			if (state.calculateCompactables() > maxFiles && state.startCompaction())
+				executor.submit(new Compactor());
+				
+		} finally {
+			state.readLock.unlock();
+		}
+	}
+	
+	/* +---------------------------------+
+	 * | ScheduledTask Robots start here |
+	 * +---------------------------------+
 	 */
-	private class Flusher implements Runnable {
+	
+	/*
+	 * Flusher is executed every sketches.flusherdelay (default: 10s)
+	 * and makes sure written data doesn't stay in buffer too long
+	 * for durability. 
+	 */
+	private class Flusher 
+	implements Runnable {
 
+		@Override
 		public void run() {
 
-			readLock.lock();
-
+			state.readLock.lock();
 			try {
 				
-				writer.flush();
+				state.getMutator().flush();
 
-			} catch (IOException e) {
-				logger.error("Flusher: couldn't flush!", e);
+			} catch (Exception e) {
+				logger.error("Error while flushing", e);
+			} finally {
+				state.readLock.unlock();
+			}
+		}
+	}
+	
+	/*
+	 * This is executed every sketches.scriberdelay (default: 30s) and checks
+	 * whether Memstore has seen over sketches.memstore.maxsize (default: 64MB)
+	 * of data. In that case it scribes it to SFile. Only one of these threads
+	 * is running at each time and it triggers a compaction after it's done.
+	 * It can run concurrently to a Flusher and to a Compactor.
+	 * 
+	 * Important: timing is an issue here, if filling memstore takes less time
+	 * than scribing, we will have delays. This should only happen in a write-only
+	 * scenario as writing to logfile or to SFile has the same cost (append-only 
+	 * writes), but memstore has hashmap's overhead and scribing has the overhead 
+	 * of sorting and indexing.
+	 */ 
+	private class ScriberScheduler 
+	implements Runnable {
+
+		@Override
+		public void run() {
+			int threshold = conf.getInt("sketches.memstore.maxsize", 64) * 1024 * 1024;
+
+			state.readLock.lock();
+			try {
+				
+				if (state.getMutator().getSize() >= threshold)
+					executor.submit(new Scriber());
+				
+			} catch (Exception e) {
+				logger.error("Error while running a scriber schedule", e);
+			} finally {
+				state.readLock.unlock();
+			}
+		}
+	}
+	
+	private class Scriber
+	implements Runnable {
+
+		@Override
+		public void run() {
+
+			try {
+
+				OperationReaders readers = state.getReaders();
+				Memstore oldStore, newStore;
+				SFile ramSFile;
+				
+				// 1st: create a new Memstore and create an in-memory SFile with the old one
+				state.writeLock.lock();
+				try {
+
+					newStore = new Memstore();
+					oldStore = readers.setMemstore(newStore);
+					ramSFile = new RAMSFile(oldStore);
+					readers.add(ramSFile);
+					
+					state.setMutator(newStore);
+					state.log(new NewLogfile(newStore.getName()));
+					
+				} finally {
+					state.writeLock.unlock();
+				}
+
+				String filename = FilenamesFactory.getSFileName();
+				
+				// 2nd: scribe the old memstore to a proper SFile
+				SketchesHelper.scribe(oldStore, filename);
+				
+				// 3rd: substitute the in-memory SFile with the one on-disk
+				state.writeLock.lock();
+				try {
+
+					// switch temporary RAMSFile with fresh new SFile
+					readers.remove(ramSFile);
+					readers.add(new FSSFile(filename));
+					
+					state.log(new NewScribedSFile(filename, oldStore.getName()));
+
+				} finally {
+					state.writeLock.unlock();
+				}
+
+				// 4th: see if there's work for the Compactor
+				scheduleCompaction();
+				
+			} catch (Exception e) {
+				logger.error("Error while running scribing", e);
+			} 
+		}
+		
+	}
+	/*
+	 * Compactor is triggered by the Scriber or by itself and there will be just one
+	 * Compactor running each time. For long-running Compactors it can happen that
+	 * Scriber has created new SFiles in the meantime (thus exceding sketches.sfile.maxfiles),
+	 * therefor Compactor triggers a possible new Compactor when it's finished.
+	 */ 
+	private class Compactor 
+	implements Runnable {
+
+		private final OperationReaders readers = state.getReaders();
+		
+		@Override
+		public void run() { 
+
+			try {
+
+				SFile younger, older;
+				boolean major;
+
+				// 1st: select the SFiles to compact
+				state.readLock.lock();
+				try {
+
+					OperationReader[] readersArray = readers.toArray();
+					
+					try {
+
+						int idx = selectSFile(readersArray);
+					
+						major   = (idx == readersArray.length - 1);
+						older   = (SFile) readersArray[idx];
+						younger = (SFile) readersArray[idx - 1];
+					
+					} catch (UncompactableException e) {
+						logger.debug("Aborting Compaction", e);
+						return;
+					}
+					
+				} finally { 
+					state.readLock.unlock();
+				}
+				
+				String filename = FilenamesFactory.getSFileName();
+
+				// 2nd: compact them
+				SketchesHelper.compact(younger.getName(), older.getName(), filename, major);
+
+				// 3rd: remove the old SFiles and insert the fresh compact SFile
+				state.writeLock.lock();
+				try {
+				
+					readers.remove(younger);
+					readers.remove(older);
+					readers.add(new FSSFile(filename));
+					
+					state.log(new NewCompactedSFile(younger.getName(), older.getName(), filename, major));
+
+				} finally {
+					state.writeLock.unlock();
+				}
+				
+			} catch (Exception e) {
+				logger.error("Error while running compaction", e);
+			} finally {
+				state.stopCompaction();
+				scheduleCompaction(); // is there more work for us?
+			}
+		}
+		
+		/*
+		 * Selection policy. Try to merge files that are close in size, so we try to avoid small 
+		 * adds to extablished big SFiles.
+		 * Also, by taking minimum (possibly negative), we try to have bigger old files instead 
+		 * of bigger young ones.
+		 */
+		private int selectSFile(OperationReader[] readersArray) {
+
+			boolean compactable[] = new boolean[readersArray.length];
+			long sizes[] = new long[readersArray.length];
+			long diffs[] = new long[readersArray.length - 1];
+			long min = Long.MAX_VALUE;
+			int idx	 = -1;
+
+			int i = 0;
+			for (OperationReader reader: readersArray) {
+				sizes[i] = reader.getSize();
+				compactable[i++] = reader.isCompactable();
+			}
+
+			for (i = 0; i < diffs.length; i++) {
+				diffs[i] = sizes[i + 1] - sizes[i];
+
+				if (diffs[i] < min && compactable[i] && compactable[i + 1]) {
+					min = diffs[i];
+					idx = i;
+				}
+			}
+
+			if (idx == -1)
+				throw new UncompactableException("Can't find 2 compactable SFiles close");
+				
+			return idx;
+		}
+		
+		private class UncompactableException extends RuntimeException {
+			
+			private static final long serialVersionUID = -8568111599942143236L;
+
+			public UncompactableException(String error) {
+				super(error);
+			}
+		}
+	}
+		
+	public class SketchesState {
+
+		private final AtomicBoolean isUnderCompaction = new AtomicBoolean(false);
+		private final AtomicBoolean isShutdown        = new AtomicBoolean(false);
+		private final OperationReaders readers        = new OperationReaders();
+		private final ReentrantReadWriteLock lock     = new ReentrantReadWriteLock();
+		private OperationMutator mutator;
+		private Logfile stateLog;
+		public final Lock readLock  = lock.readLock();
+		public final Lock writeLock = lock.writeLock();
+
+		public void init()
+		throws IOException {
+
+			StateLogReader stateLogReader = new StateLog.StateLogReader();
+			stateLogReader.replay();
+			
+			String logfile = stateLogReader.getLogfile();
+			List<String> sfiles    = stateLogReader.getSFiles();
+			List<String> screibees = stateLogReader.getScribees();
+
+		}
+
+		public void shutdown() 
+		throws IOException {
+		
+			for (OperationReader reader: readers)
+				reader.close();
+			
+			stateLog.close();
+		}
+
+		/*
+		 * Grants access to the readers List. Guarded by readLock for reading and by writeLock for
+		 * modification.
+		 */
+		public OperationReaders getReaders() {
+			return this.readers;
+		}
+
+		/*
+		 * Grants access to the mutator. Guarded by readLock.
+		 */
+		public OperationMutator getMutator() {
+			return this.mutator;
+		}
+
+		/*
+		 * Sets a new mutator. Guarded by writeLock.
+		 */
+		public void setMutator(OperationMutator mutator) {
+			this.mutator = mutator;
+		}
+
+		public boolean isUnderCompaction() {
+			return isUnderCompaction.get();
+		}
+		
+		public boolean startCompaction() {
+			return isUnderCompaction.compareAndSet(false, true);
+		}
+		
+		public boolean stopCompaction() {
+			return isUnderCompaction.compareAndSet(true, false);
+		}
+		
+		public int calculateCompactables() {
+
+			readLock.lock();
+			try {
+
+				int compactableFiles = 0;
+				for (OperationReader reader: readers)
+					if (reader.isCompactable())
+						compactableFiles++;
+
+				return compactableFiles;
+
 			} finally {
 				readLock.unlock();
 			}
 		}
-	}
-	
-	private class Scriber implements Runnable {
-		private final int threshold; // maxSize of Memstore in bytes
 		
-		public Scriber(int threshold) {
-			this.threshold = threshold * 1024 * 1024; 
+		public boolean isShutdown() {
+			return isShutdown.get();
 		}
-
-		public void run() {
-
-			readLock.lock();
-			
-			if (writer.getSize() > threshold) {
-				readLock.unlock();
-				writeLock.lock();
-			
-				// as we are the only one modifying this datastructure and
-				// we have just one bomber each time, we don't really need
-				// to check again for the condition.
-				assert writer.getSize() > threshold: "Scriber: memory has shrunk between two checks!";
-				assert readers.get(0) instanceof Memstore: "head of readers is not a Memstore";
-				
-				Memstore oldStore = (Memstore) readers.get(0);
-				RAMSFile ramSFile = new RAMSFile(oldStore);
-				Memstore newStore = new Memstore();
-
-				readers.set(0, newStore); // substitute old with new clean store
-				readers.add(1, ramSFile); // insert temporary SFile
-				writer = newStore;
-				
-				writeLock.unlock();
-				
-				// convert to SFile
-				SFile newSFile = null;
-				try {
-					newSFile = SketchesHelper.scribe(oldStore);
-				} catch (IOException e) {
-					logger.error("Scriber: failed scribing " + oldStore, e);
-				}
-				
-				writeLock.lock();
-				
-				// switch temporary RAMSFile with fresh new SFile
-				readers.set(readers.indexOf(ramSFile), newSFile);
-				
-				writeLock.unlock();
-				
-				scheduleCompaction();
-			}
-		}
-
-		private void scheduleCompaction() {
-			// run/schedule only if not already running
-			if (compactorHandle != null && compactorHandle.isDone())
-				compactorHandle = compactorScheduler.schedule(new Compactor(), 0, TimeUnit.SECONDS);
-		}
-	}
-	
-	private class Compactor implements Runnable {
 		
-		public void run() {
-			
+		public boolean setShutdown() {
+			return isShutdown.getAndSet(true);
+		}
+		
+		public void log(Writable o) 
+		throws IOException {
+
+			stateLog.write(o);
 		}
 	}
 }

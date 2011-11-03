@@ -30,7 +30,7 @@ import org.slf4j.LoggerFactory;
 import com.google.common.primitives.UnsignedBytes;
 
 /**
- * Iterable set of MuralIterator. Returns element with smallest key.
+ * Iterable set of SFileIterator. Returns element with smallest key.
  * It expects the iterators List passed to the constructor to be sorted by time.
  * iterators[0].getTimestamp() > iterators[1].getTimestamp() > ... > iterators[n].getTimestamp()
  * When two elements with the same key are found, the youngest is returned.
@@ -40,13 +40,17 @@ import com.google.common.primitives.UnsignedBytes;
  *
  */
 
-public class FSSFileCursor implements Closeable {
+public class FSSFileCursor 
+implements Closeable {
+
 	private static final Logger logger = LoggerFactory.getLogger(FSSFileCursor.class);
 	private final Comparator<byte[]> comparator = UnsignedBytes.lexicographicalComparator();
 	private final List<FSSFileIterator> iterators;
 	private final List<SFileCursor> cursors;
 
-	public FSSFileCursor(List<FSSFileIterator> iterators) throws IOException {
+	public FSSFileCursor(List<FSSFileIterator> iterators) 
+	throws IOException {
+	
 		this.iterators = iterators;
 		this.cursors   = new LinkedList<SFileCursor>();
 		for (FSSFileIterator iterator: iterators)
@@ -60,13 +64,17 @@ public class FSSFileCursor implements Closeable {
 	/**
 	 * @return the next youngest element with the smallest key among the Murals
 	 */
-	public Operation next() throws IOException {
+	public Operation next() 
+	throws IOException {
+	
 		if (!hasNext()) throw new NoSuchElementException();
 		
 		return getMinimum(); 
 	}
 
-	public void close() throws IOException {
+	public void close() 
+	throws IOException {
+	
 		for (FSSFileIterator iterator: iterators)
 			iterator.close();
 	}
@@ -74,7 +82,9 @@ public class FSSFileCursor implements Closeable {
 	// XXX: for performance this chould be an ArrayList
 	private LinkedList<SFileCursor> minima = new LinkedList<SFileCursor>();
 	
-	private Operation getMinimum() throws IOException {
+	private Operation getMinimum() 
+	throws IOException {
+	
 		Iterator<SFileCursor> iter = cursors.iterator();
 		SFileCursor cursor = iter.next();
 		Operation minimum  = cursor.getValue();
@@ -100,7 +110,8 @@ public class FSSFileCursor implements Closeable {
 		return minimum;
 	}
 	
-	private void advance(List<SFileCursor> minima) throws IOException {
+	private void advance(List<SFileCursor> minima) 
+	throws IOException {
 		
 		for (SFileCursor cursor: minima) {
 			if (cursor.hasNext()) {
@@ -115,6 +126,7 @@ public class FSSFileCursor implements Closeable {
 	 * XXX: this probably skips the last element 
 	 */
 	private class SFileCursor {
+		
 		private final FSSFileIterator iterator;
 		private Operation value;
 		

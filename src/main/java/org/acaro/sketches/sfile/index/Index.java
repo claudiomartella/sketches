@@ -9,4 +9,5 @@ public interface Index {
 	public long getOffset(long position);
 	public Index putOffset(long offset);
 	public Index putOffset(long position, long offset);
+	public void load();
 }
